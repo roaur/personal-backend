@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres/initdb:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d db -U user"]
+      interval: 3s
+      retries: 5
+
+  fastapi:
+    build: ./fastapi
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db
+      POSTGRES_HOST: postgres
+      SQLALCHEMY_DATABASE_URL: postgresql+psycopg://user:password@postgres/db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"

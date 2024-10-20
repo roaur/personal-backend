@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+airflow/logs/
+airflow/dags/__pycache__/
+/tmp/*.json
+**/.lichess.token
