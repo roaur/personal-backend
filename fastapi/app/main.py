@@ -49,3 +49,6 @@ async def add_move(game_id: str, move: schemas.GameMoveCreate, db: AsyncSession 
 async def add_player_to_game(game_id: str, player: schemas.GamePlayerCreate, db: AsyncSession = Depends(get_db)):
     db_game_player = await crud.add_player_to_game(db, game_id, player)
     return db_game_player
+
+## TODO: Add endpoints that combine writing a game and players (or searching for players in the db)
+## TODO: Handle incoming game PGNs. Split the records somehow to write to GameMove
