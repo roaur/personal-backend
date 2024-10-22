@@ -16,6 +16,11 @@ async def get_games(db: AsyncSession, skip: int = 0, limit: int = 10):
     result = await db.execute(select(models.Game).offset(skip).limit(limit))
     return result.scalars().all()
 
+# Get players in a game
+async def get_players_from_game(db: AsyncSession, lichess_id: str):
+    result = await db.execute(select(models.GamePlayer).filter(models.GamePlayer.lichess_game_id == lichess_id))
+    return result.scalars().all()
+
 # Create a new player
 async def create_player(db: AsyncSession, player: schemas.PlayerCreate):
     db_player = models.Player(**player.dict())

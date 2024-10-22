@@ -50,5 +50,11 @@ async def add_player_to_game(game_id: str, player: schemas.GamePlayerCreate, db:
     db_game_player = await crud.add_player_to_game(db, game_id, player)
     return db_game_player
 
+# Endpoint to get players from a game
+@app.get("/players/{game_id}", response_model=list[schemas.GamePlayer])
+async def get_players_from_game(game_id: str, db: AsyncSession = Depends(get_db)):
+    db_game_players = await crud.get_players_from_game(db, game_id)
+    return db_game_players
+
 ## TODO: Add endpoints that combine writing a game and players (or searching for players in the db)
 ## TODO: Handle incoming game PGNs. Split the records somehow to write to GameMove
