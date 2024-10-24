@@ -1,3 +1,4 @@
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -14,11 +15,22 @@ async def create_game(db: AsyncSession, game: schemas.GameCreate):
         game_data['clock_initial'] = clock_data['initial']
         game_data['clock_increment'] = clock_data['increment']
         game_data['clock_total_time'] = clock_data['totalTime']
-    db_game = models.Game(**game_data)  # Convert Pydantic model to SQLAlchemy model
-    db.add(db_game)
+
+    # Create an upsert statement (insert on conflict)
+    stmt = insert(models.Game).values(**game_data).on_conflict_do_update(
+        index_elements=['id'],  # Assume `id` is the primary key for conflict detection
+        set_=game_data       # Fields to update in case of conflict
+    )
+
+    # Execute the statement
+    await db.execute(stmt)
     await db.commit()
-    await db.refresh(db_game)
-    return db_game
+
+    # Fetch the inserted/updated row for returning
+    result = await db.execute(
+        select(models.Game).filter_by(id=game_data['id'])
+    )
+    return result.scalar_one()
 
 # Get a list of games
 async def get_games(db: AsyncSession, skip: int = 0, limit: int = 10):
