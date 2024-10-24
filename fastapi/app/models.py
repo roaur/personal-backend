@@ -17,13 +17,13 @@ class Game(Base):
     __tablename__ = 'games'
     __table_args__ = {'schema': 'chess'}
     
-    lichess_game_id = Column(String(255), primary_key=True)
+    id = Column(String(255), primary_key=True)
     rated = Column(Boolean, nullable=False)
     variant = Column(String(50), nullable=False)
     speed = Column(String(50), nullable=False)
     perf = Column(String(50), nullable=False)
-    created_at = Column(TIMESTAMP(timezone=True), nullable=False)
-    last_move_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    createdAt = Column(TIMESTAMP(timezone=True), nullable=False)
+    lastMoveAt = Column(TIMESTAMP(timezone=True), nullable=False)
     status = Column(String(50), nullable=False)
     source = Column(String(50))
     winner = Column(String(50))

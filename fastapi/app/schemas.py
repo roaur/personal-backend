@@ -4,30 +4,36 @@ from typing import Optional
 
 # Game Pydantic schema
 class GameCreate(BaseModel):
-    lichess_game_id: str
+    id: str
     rated: bool
     variant: str
     speed: str
     perf: str
-    created_at: datetime
-    last_move_at: datetime
+    createdAt: datetime
+    lastMoveAt: datetime
     status: str
     source: Optional[str]
     winner: Optional[str]
     pgn: Optional[str]
+    clock_initial: int
+    clock_increment: int
+    clock_total_time: int
 
 class Game(BaseModel):
-    lichess_game_id: str
+    id: str
     rated: bool
     variant: str
     speed: str
     perf: str
-    created_at: datetime
-    last_move_at: datetime
+    createdAt: datetime
+    lastMoveAt: datetime
     status: str
     source: Optional[str]
     winner: Optional[str]
     pgn: Optional[str]
+    clock_initial: int
+    clock_increment: int
+    clock_total_time: int
 
     class Config:
         orm_mode = True

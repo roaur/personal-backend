@@ -5,7 +5,16 @@ from app import models, schemas
 
 # Create a new game
 async def create_game(db: AsyncSession, game: schemas.GameCreate):
-    db_game = models.Game(**game.dict())  # Convert Pydantic model to SQLAlchemy model
+    # Convert game to a dict and extract the clock data
+    game_data = game.dict()  # This converts the Pydantic model to a dictionary
+    clock_data = game_data.pop('clock', None)  # Remove and get the clock object
+
+    # If clock data exists, flatten it into individual fields
+    if clock_data:
+        game_data['clock_initial'] = clock_data['initial']
+        game_data['clock_increment'] = clock_data['increment']
+        game_data['clock_total_time'] = clock_data['totalTime']
+    db_game = models.Game(**game_data)  # Convert Pydantic model to SQLAlchemy model
     db.add(db_game)
     await db.commit()
     await db.refresh(db_game)
