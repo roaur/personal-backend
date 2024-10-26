@@ -7,17 +7,18 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Copy requirements.txt into the container
-COPY requirements.txt .
+COPY ./fastapi/requirements.txt .
 
 # Install dependencies from requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the Alembic configuration file
-COPY ./alembic.ini /app/alembic.ini
+COPY ./fastapi/alembic.ini /app/alembic.ini
 
 # Copy the FastAPI app code and migrations into the container
-COPY ./app /app/app
-COPY ./migrations /app/migrations
+COPY ./fastapi/app /app/app
+COPY ./fastapi/migrations /app/migrations
+COPY .env /app/.env
 
 # Expose FastAPI port
 EXPOSE 8000

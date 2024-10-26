@@ -2,9 +2,9 @@ services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -15,15 +15,68 @@ services:
       retries: 5
 
   fastapi:
-    build: ./fastapi
+    build: 
+      context: .
+      dockerfile: ./fastapi/Dockerfile
+    env_file:
+      - .env  # This ensures the environment variables are loaded
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: postgres
-      SQLALCHEMY_DATABASE_URL: postgresql+psycopg://user:password@postgres/db
+      SQLALCHEMY_DATABASE_URL: postgresql+psycopg:///${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "8000:8000"
+    # volumes:
+    #   - ./fastapi:/app  # Mount your FastAPI code
+
+# Airflow Scheduler
+  airflow-scheduler:
+    build: ./airflow  # Path to Airflow Dockerfile
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__WEBSERVER__WORKERS: 4
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags  # Mount the DAGs
+      - ./airflow/utils:/opt/airflow/utils  # Mount the utils
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    entrypoint: >
+      bash -c "
+      airflow db init &&
+      airflow scheduler"
+
+  # Airflow Webserver
+  airflow-webserver:
+    build: ./airflow
+    depends_on:
+      - airflow-scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    ports:
+      - "8080:8080"  # Airflow webserver port
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/utils:/opt/airflow/utils
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    entrypoint: >
+      bash -c "
+      airflow webserver"
+
+volumes:
+  airflow_logs:
+  airflow_plugins:
+  postgres_data:
