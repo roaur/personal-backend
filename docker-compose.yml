@@ -14,6 +14,18 @@ services:
       interval: 3s
       retries: 5
 
+  # Airflow Postgres service
+  postgres_airflow:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
+    ports:
+      - "5433:5432"  # Exposing it on a different port to avoid conflicts with FastAPI Postgres
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql/data
+
   fastapi:
     build: 
       context: .
@@ -38,11 +50,11 @@ services:
   airflow-scheduler:
     build: ./airflow  # Path to Airflow Dockerfile
     depends_on:
-      - postgres
+      - postgres_airflow
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@postgres_airflow/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__WEBSERVER__WORKERS: 4
     volumes:
@@ -60,11 +72,18 @@ services:
     build: ./airflow
     depends_on:
       - airflow-scheduler
+      - postgres_airflow
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@postgres_airflow/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW_WEB_USERNAME: ${AIRFLOW_WEB_USERNAME}
+      AIRFLOW_WEB_PASSWORD: ${AIRFLOW_WEB_PASSWORD}
+      AIRFLOW_WEB_FIRST_NAME: ${AIRFLOW_WEB_FIRST_NAME}
+      AIRFLOW_WEB_LAST_NAME: ${AIRFLOW_WEB_LAST_NAME}
+      AIRFLOW_WEB_ROLE: ${AIRFLOW_WEB_ROLE}
+      AIRFLOW_WEB_EMAIL: ${AIRFLOW_WEB_EMAIL}
     ports:
       - "8080:8080"  # Airflow webserver port
     volumes:
@@ -74,9 +93,12 @@ services:
       - airflow_plugins:/opt/airflow/plugins
     entrypoint: >
       bash -c "
+      airflow db init &&
+      airflow users create --username ${AIRFLOW_WEB_USERNAME} --password ${AIRFLOW_WEB_PASSWORD} --firstname ${AIRFLOW_WEB_FIRST_NAME} --lastname ${AIRFLOW_WEB_LAST_NAME} --role ${AIRFLOW_WEB_ROLE} --email ${AIRFLOW_WEB_EMAIL} &&
       airflow webserver"
 
 volumes:
   airflow_logs:
   airflow_plugins:
   postgres_data:
+  postgres_airflow_data:
