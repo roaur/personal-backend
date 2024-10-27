@@ -9,6 +9,7 @@ services:
       - "5432:5432"
     volumes:
       - ./postgres/initdb:/docker-entrypoint-initdb.d/
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d db -U user"]
       interval: 3s
@@ -25,6 +26,10 @@ services:
       - "5433:5432"  # Exposing it on a different port to avoid conflicts with FastAPI Postgres
     volumes:
       - postgres_airflow_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d db -U user"]
+      interval: 3s
+      retries: 5
 
   fastapi:
     build: 
