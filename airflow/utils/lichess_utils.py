@@ -1,77 +1,107 @@
 import berserk
+from config import settings
+from typing import Dict, List, Tuple, Generator
 import json
+from datetime import datetime
 import requests
 import time
 
 
-def validate_game_object(game):
-    """Ensure the game object is a valid dictionary."""
-    if isinstance(game, str):
-        # If the input is a string, try to parse it as JSON
-        try:
-            game = json.loads(game)
-        except json.JSONDecodeError:
-            raise ValueError("Invalid JSON string passed as game object.")
+def setup_berserk_client() -> berserk.Client:
+    """Initialize the berserk client using the Lichess token from settings."""
+    session = berserk.TokenSession(settings.lichess_token)
+    client = berserk.Client(session)
+    return client
+
+
+def stream_matches(
+        username: str = None, 
+        max_matches: int = None, 
+        since: datetime = None
+    ) -> Generator[Dict, None, None]:
+    """
+    Stream matches for the given username, limited by max_matches.
+    Uses default username and max matches from settings if not provided.
+    """
+    username = username or settings.lichess_username
+    max_matches = max_matches or settings.max_matches
     
-    if not isinstance(game, dict):
-        raise ValueError("Game object must be a dictionary.")
-    
-    return game
+    client = setup_berserk_client()
+    if since:
+        for match in client.games.export_by_player(
+                username=username, 
+                max=max_matches, 
+                as_pgn=False, 
+                moves=True, 
+                since=since,
+                opening=True,
+            ):
+            yield match
+    else:
+        for match in client.games.export_by_player(
+                username=username, 
+                max=max_matches, 
+                as_pgn=False, 
+                moves=True,
+                opening=True,
+            ):
+            yield match
 
 
-def download_lichess_games(token: str, username: str, max_games: int = 100):
-    """Download games for a given Lichess user using the Berserk API."""
-    with open('./.lichess.token') as f:
-        token = f.read()
-
-    session = berserk.TokenSession(token)
-    client = berserk.Client(session=session)
-    
-    games = client.games.export_by_player(username, max=max_games)
-    return list(games)
-
-
-# Download games in batches from Berserk generator
-def download_games_batch(username, batch_size=100):
-    with open('./.lichess.token') as f:
-        token = f.read()
-    client = berserk.Client(token=token)
-    game_generator = client.games.export_by_player(username)
-    batch = []
-    
-    for game in game_generator:
-        batch.append(game)
-        if len(batch) == batch_size:
-            yield batch  # Return the batch once it's full
-            batch = []
-
-    if batch:  # If there's a partial batch left, yield it
-        yield batch
-
-
-def parse_game(game):
-    """Parse individual game details from Lichess."""
+def format_match_core(game: Dict) -> Dict:
+    """
+    Extract core game information for the main game table.
+    """
     return {
-        "lichess_game_id": game['id'],
-        "rated": game.get('rated', False),
-        "variant": game['variant'],
-        "speed": game['speed'],
-        "perf": game['perf'],
-        "created_at": game['createdAt'],
-        "last_move_at": game['lastMoveAt'],
-        "status": game['status'],
-        "source": game.get('source', ''),
-        "winner": game.get('winner', ''),
-        "pgn": game.get('pgn', ''),
-        "clock_initial": game.get('clock', {}).get('initial', 0),
-        "clock_increment": game.get('clock', {}).get('increment', 0),
-        "clock_total_time": game.get('clock', {}).get('totalTime', 0)
+        "lichess_game_id": game["id"],
+        "rated": game.get("rated", False),
+        "variant": game["variant"],
+        "speed": game["speed"],
+        "perf": game["perf"],
+        "created_at": game["createdAt"],
+        "last_move_at": game["lastMoveAt"],
+        "status": game["status"],
+        "source": game.get("source", ""),
+        "winner": game.get("winner", ""),
+        "pgn": game.get("pgn", ""),
+        "clock_initial": game.get("clock", {}).get("initial", 0),
+        "clock_increment": game.get("clock", {}).get("increment", 0),
+        "clock_total_time": game.get("clock", {}).get("totalTime", 0)
     }
+
+def format_players(game: Dict) -> List[Dict]:
+    """
+    Extract player information, returning a list of player records.
+    """
+    players_data = []
+    for color, player_info in game["players"].items():
+        players_data.append({
+            "lichess_game_id": game["id"],
+            "player_lichess_id": player_info["user"]["id"],
+            "name": player_info["user"]["name"],
+            "color": color,
+            "rating": player_info.get("rating"),
+            "rating_diff": player_info.get("ratingDiff", 0),
+            "flair": player_info.get("flair")
+        })
+    return players_data
+
+def format_moves(game: Dict) -> List[Dict]:
+    """
+    Extract moves as individual records with move numbers.
+    """
+    moves_list = game["moves"].split(" ")
+    return [
+        {
+            "lichess_game_id": game["id"],
+            "move_number": i + 1,
+            "move": move
+        }
+        for i, move in enumerate(moves_list)
+    ]
 
 def extract_moves_from_game(game: dict):
     """Extract individual moves from the 'moves' field in the game object."""
-    validate_game_object(game)
-    
     moves_str = game.get('moves', '')
     if not moves_str:
         raise ValueError("No moves found in the game object.")
@@ -82,7 +112,6 @@ def extract_moves_from_game(game: dict):
 
 def extract_players_from_game(game: dict):
     """Extract the white and black player information from the game object."""
-    validate_game_object(game)
     
     players = game.get('players', {})
     if not players:
@@ -110,8 +139,6 @@ def extract_players_from_game(game: dict):
 
 def link_players_to_game(game: dict):
     """Prepare the many-to-many link data for players and game from the game object."""
-    validate_game_object(game)
-    
     game_id = game.get('id')
     if not game_id:
         raise ValueError("No game ID found in the game object.")
