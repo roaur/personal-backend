@@ -12,8 +12,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d db -U user"]
-      interval: 3s
-      retries: 5
+      interval: 1s
+      retries: 10
 
   # Airflow Postgres service
   postgres_airflow:
@@ -28,8 +28,8 @@ services:
       - postgres_airflow_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d db -U user"]
-      interval: 3s
-      retries: 5
+      interval: 1s
+      retries: 10
 
   fastapi:
     build: 
