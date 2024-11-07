@@ -1,4 +1,5 @@
 import psycopg
+from psycopg.rows import dict_row
 import requests
 from config import settings
 from typing import Dict
@@ -54,3 +55,9 @@ def save_game(game_data: Dict, use_api: bool = False):
         post_game_api(game_data)
     else:
         insert_game_psycopg(game_data)
+
+def are_there_games_already() -> bool:
+    with psycopg.connection(DATABASE_URL) as con:
+        with con.cursor(row_factory=dict_row) as cur:
+            results = cur.execute("select count(*) as thecount from games").fetchone()
+    return results['thecount'] > 0
