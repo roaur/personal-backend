@@ -42,14 +42,12 @@ class Game(BaseModel):
 class PlayerCreate(BaseModel):
     lichess_id: str
     name: str
-    rating: int
     flair: Optional[str] = None
 
 class Player(BaseModel):
     id: int
     lichess_id: str
     name: str
-    rating: int
     flair: Optional[str] = None
 
     class Config:
@@ -76,12 +74,14 @@ class GamePlayerCreate(BaseModel):
     player_id: int
     color: str
     rating_diff: Optional[int] = None
+    rating: int
 
 class GamePlayer(BaseModel):
     lichess_game_id: str
     player_id: int
     color: str
     rating_diff: Optional[int] = None
+    rating: int
 
     class Config:
         orm_mode = True
