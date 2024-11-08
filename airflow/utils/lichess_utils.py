@@ -5,13 +5,45 @@ import json
 from datetime import datetime
 import requests
 import time
+import logging
+
+from berserk import TokenSession
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+logger = logging.getLogger(__name__)
 
 
-def setup_berserk_client() -> berserk.Client:
-    """Initialize the berserk client using the Lichess token from settings."""
-    session = berserk.TokenSession(settings.lichess_token)
-    client = berserk.Client(session)
-    return client
+class RateLimitingAdapter(HTTPAdapter):
+    """
+    Custom HTTPAdapter to handle rate-limiting for the Lichess API.
+    Retries on HTTP 429 responses with a delay.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_retries = Retry(
+            total=5,  # Maximum number of retries
+            backoff_factor=60,  # Wait 60 seconds for 429 responses
+            status_forcelist=[429],  # Retry on Too Many Requests
+        )
+
+    def send(self, request, **kwargs):
+        response = super().send(request, **kwargs)
+        if response.status_code == 429:
+            logger.info("Rate limit reached. Waiting for 60 seconds...")
+        return response
+
+
+def setup_berserk_client() -> TokenSession:
+    """
+    Set up Berserk's TokenSession with a custom HTTPAdapter.
+    """
+    session = TokenSession(settings.lichess_token)
+    adapter = RateLimitingAdapter()
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 
 def stream_matches(
