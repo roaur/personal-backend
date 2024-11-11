@@ -2,6 +2,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import func
 from app import models, schemas
 
 # Create a new game
@@ -70,3 +71,13 @@ async def add_player_to_game(db: AsyncSession, game_id: str, player: schemas.Gam
     await db.commit()
     await db.refresh(db_game_player)
     return db_game_player
+
+# Get the most recent lastMoveAt in unix milliseconds from the games table
+async def get_last_move_time(db: AsyncSession) -> int:
+    result = await db.execute(
+        select(func.max(models.Game.last_move_at))  # Get the maximum lastMoveAt
+    )
+    last_move_time = result.scalar()
+    if last_move_time:
+        return {"last_move_time": int(last_move_time.timestamp() * 1000)}  # Wrap in a dictionary
+    return {"last_move_time": 0}  # Return 0 wrapped in a dictionary
