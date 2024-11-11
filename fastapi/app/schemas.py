@@ -4,13 +4,13 @@ from typing import Optional
 
 # Game Pydantic schema
 class GameCreate(BaseModel):
-    id: str
+    game_id: str
     rated: bool
     variant: str
     speed: str
     perf: str
-    createdAt: datetime
-    lastMoveAt: datetime
+    created_at: datetime
+    last_move_at: datetime
     status: str
     source: Optional[str]
     winner: Optional[str]
@@ -20,13 +20,13 @@ class GameCreate(BaseModel):
     clock_total_time: int
 
 class Game(BaseModel):
-    id: str
+    game_id: str
     rated: bool
     variant: str
     speed: str
     perf: str
-    createdAt: datetime
-    lastMoveAt: datetime
+    created_at: datetime
+    last_move_at: datetime
     status: str
     source: Optional[str]
     winner: Optional[str]

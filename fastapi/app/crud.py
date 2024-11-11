@@ -19,8 +19,9 @@ async def create_game(db: AsyncSession, game: schemas.GameCreate):
 
     # Create an upsert statement (insert on conflict)
     stmt = insert(models.Game).values(**game_data).on_conflict_do_update(
-        index_elements=['id'],  # Assume `id` is the primary key for conflict detection
+        index_elements=['game_id'],  # on game_id conflict do update
         set_=game_data       # Fields to update in case of conflict
+                             # basically, all of them
     )
 
     # Execute the statement
@@ -29,7 +30,7 @@ async def create_game(db: AsyncSession, game: schemas.GameCreate):
 
     # Fetch the inserted/updated row for returning
     result = await db.execute(
-        select(models.Game).filter_by(id=game_data['id'])
+        select(models.Game).filter_by(game_id=game_data['game_id'])
     )
     return result.scalar_one()
 
