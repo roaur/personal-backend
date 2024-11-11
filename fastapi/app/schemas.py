@@ -85,3 +85,9 @@ class GamePlayer(BaseModel):
 
     class Config:
         orm_mode = True
+
+class LastMoveTimeResponse(BaseModel):
+    last_move_time: int # unix time in milliseconds
+
+    class Config:
+        orm_mode = True

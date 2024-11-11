@@ -27,14 +27,20 @@ load_dotenv('/app/.env')
 # This lets us use alembic locally and should still
 # allow for postgres connections to be made via .env
 postgres_host = os.getenv("POSTGRES_HOST", "localhost")
-try:
-    # Try to resolve the Docker hostname
-    socket.gethostbyname(postgres_host)
-except socket.gaierror:
-    # If it fails, switch to 'localhost' for host machine
-    postgres_host = "localhost"
+# try:
+#     # Try to resolve the Docker hostname
+#     socket.gethostbyname(postgres_host)
+# except socket.gaierror:
+#     # If it fails, switch to 'localhost' for host machine
+#     postgres_host = "localhost"
 
 db_url = f"postgresql+psycopg://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{postgres_host}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB')}"
+
+print(f"POSTGRES_USER={os.getenv('POSTGRES_USER')}")
+print(f"POSTGRES_PASSWORD={os.getenv('POSTGRES_PASSWORD')}")
+print(f"POSTGRES_DB={os.getenv('POSTGRES_DB')}")
+print(f"POSTGRES_HOST={postgres_host}")
+print(f"Constructed DB URL: {db_url}")
 
 # Set the database URL in the Alembic config
 config.set_main_option('sqlalchemy.url', db_url)
