@@ -3,6 +3,11 @@ from datetime import datetime
 from typing import Optional
 
 # Game Pydantic schema
+class Clock(BaseModel):
+    initial: int
+    increment: int
+    total_time: int
+
 class GameCreate(BaseModel):
     game_id: str
     rated: bool
@@ -12,12 +17,10 @@ class GameCreate(BaseModel):
     created_at: datetime
     last_move_at: datetime
     status: str
-    source: Optional[str]
-    winner: Optional[str]
-    pgn: Optional[str]
-    clock_initial: int
-    clock_increment: int
-    clock_total_time: int
+    source: str
+    winner: Optional[str] = None
+    pgn: Optional[str] = None
+    clock: Clock  # Keep clock as a nested object
 
 class Game(BaseModel):
     game_id: str
