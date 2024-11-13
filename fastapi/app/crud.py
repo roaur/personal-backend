@@ -4,18 +4,31 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import func
 from app import models, schemas
+from app.data_transformers import flatten_clock_data
+from app.utils import json_serializer
+import sys
+
+import logging
+
+logger = logging.getLogger(__name__)
+# logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.setFormatter(formatter)
+file_handler = logging.FileHandler("info.log")
+file_handler.setFormatter(formatter)
+
+logger.addHandler(stream_handler)
+logger.addHandler(file_handler)
 
 # Create a new game
 async def create_game(db: AsyncSession, game: schemas.GameCreate):
     # Convert game to a dict and extract the clock data
     game_data = game.dict()  # This converts the Pydantic model to a dictionary
-    clock_data = game_data.pop('clock', None)  # Remove and get the clock object
-
-    # If clock data exists, flatten it into individual fields
-    if clock_data:
-        game_data['clock_initial'] = clock_data['initial']
-        game_data['clock_increment'] = clock_data['increment']
-        game_data['clock_total_time'] = clock_data['totalTime']
+    game_data = flatten_clock_data(game_data)
+    # print(game_data)
+    # logger.debug(game_data)
 
     # Create an upsert statement (insert on conflict)
     stmt = insert(models.Game).values(**game_data).on_conflict_do_update(

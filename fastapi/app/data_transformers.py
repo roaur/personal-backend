@@ -3,11 +3,15 @@ from datetime import datetime
 
 def flatten_clock_data(game_data: dict) -> dict:
     """Extracts and flattens 'clock' data into individual fields for the game."""
-    if 'clock' in game_data:
-        game_data['clock_initial'] = game_data['clock'].get('initial')
-        game_data['clock_increment'] = game_data['clock'].get('increment')
-        game_data['clock_total_time'] = game_data['clock'].get('totalTime')
-        del game_data['clock']  # Remove nested 'clock' after flattening
+    
+    clock_data = game_data.pop('clock', None)  # Remove and get the clock object
+
+    # If clock data exists, flatten it into individual fields
+    if clock_data:
+        game_data['clock_initial'] = clock_data['initial']
+        game_data['clock_increment'] = clock_data['increment']
+        game_data['clock_total_time'] = clock_data['total_time']
+
     return game_data
 
 def extract_players(game_data: dict) -> list[dict]:

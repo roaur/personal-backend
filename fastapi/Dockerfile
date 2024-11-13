@@ -24,4 +24,5 @@ COPY .env /app/.env
 EXPOSE 8000
 
 # Command to run Alembic migrations and start FastAPI
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug"]
+
