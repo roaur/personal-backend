@@ -3,9 +3,17 @@ from psycopg.rows import dict_row
 import requests
 from config import settings
 from typing import Dict
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 
 # Database Configurations
 DATABASE_URL = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}/{settings.POSTGRES_DB}"
+
+logger.dedug("DATABASE_URL: %s", DATABASE_URL)
 
 # 1. Database Insertion with Psycopg
 def connect_db():
@@ -61,3 +69,35 @@ def are_there_games_already() -> bool:
         with con.cursor(row_factory=dict_row) as cur:
             results = cur.execute("select count(*) as thecount from games").fetchone()
     return results['thecount'] > 0
+
+def get_last_match_time() -> int:
+    """
+    Retrieve the last match timestamp in milliseconds from the database.
+    Returns None if no matches are found.
+    """
+    query = """
+    SELECT last_match_time
+    FROM match_metadata
+    ORDER BY last_match_time DESC
+    LIMIT 1
+    """
+    with psycopg.connect("your_postgres_connection_url") as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            result = cur.fetchone()
+    return result[0] if result else None
+
+def save_last_match_time(last_match_time: int) -> None:
+    """
+    Save or update the last match timestamp in the database.
+    """
+    query = """
+    INSERT INTO match_metadata (last_match_time)
+    VALUES (%s)
+    ON CONFLICT (id_column_name) DO UPDATE
+    SET last_match_time = EXCLUDED.last_match_time
+    """
+    with psycopg.connect("your_postgres_connection_url") as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (last_match_time,))
+            conn.commit()
