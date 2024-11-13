@@ -1,8 +1,32 @@
+import uvicorn
+import sys
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app import schemas, crud, database
+from app import schemas, crud, database, settings
 
+import logging
+
+# logger = logging.getLogger('uvicorn.error')
+# http_logger = logging.getLogger('uvicorn.access')
+
+
+# logger.debug("FastAPI application starting...")
 app = FastAPI()
+# logger.debug("FastAPI application started!")
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(funcName)s %(message)s")
+
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.setFormatter(formatter)
+file_handler = logging.FileHandler("info.log")
+file_handler.setFormatter(formatter)
+
+logger.addHandler(stream_handler)
+logger.addHandler(file_handler)
+
+logger.info('API is starting up')
 
 # Dependency to get a database session
 async def get_db():
@@ -15,7 +39,9 @@ async def get_db():
 # Endpoint to create a new game
 @app.post("/games/", response_model=schemas.Game)
 async def create_game(game: schemas.GameCreate, db: AsyncSession = Depends(get_db)):
+    logger.debug(game)
     db_game = await crud.create_game(db, game)
+    logger.debug(db_game)
     return db_game
 
 # Endpoint to get a list of games
