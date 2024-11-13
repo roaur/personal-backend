@@ -24,7 +24,7 @@ class RateLimitingAdapter(HTTPAdapter):
         super().__init__(*args, **kwargs)
         self.max_retries = Retry(
             total=5,  # Maximum number of retries
-            backoff_factor=60,  # Wait 60 seconds for 429 responses
+            backoff_factor=75,  # Wait 75 seconds for 429 responses
             status_forcelist=[429],  # Retry on Too Many Requests
         )
 
