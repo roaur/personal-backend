@@ -23,6 +23,9 @@ if config.config_file_name is not None:
 # Load variables from the environment file.
 load_dotenv('/app/.env')
 
+# for local development
+load_dotenv('app/.env')
+
 # Check if running within Docker by checking hostname resolution
 # This lets us use alembic locally and should still
 # allow for postgres connections to be made via .env
