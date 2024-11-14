@@ -49,7 +49,7 @@ def upgrade() -> None:
     schema='chess'
     )
     op.create_table('game_moves',
-    sa.Column('id', sa.BigInteger(), nullable=False),
+    sa.Column('id', sa.BigInteger(), nullable=False, autoincrement=True),
     sa.Column('game_id', sa.String(length=255), nullable=False),
     sa.Column('move_number', sa.Integer(), nullable=False),
     sa.Column('move', sa.Text(), nullable=False),
