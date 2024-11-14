@@ -1,8 +1,8 @@
 import uvicorn
 import sys
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from app import schemas, crud, database, settings
+from app import schemas, crud, database, settings, utils
 
 import logging
 
@@ -65,9 +65,15 @@ async def get_player(lichess_id: str, db: AsyncSession = Depends(get_db)):
     return db_player
 
 # Endpoint to add a move to a game
-@app.post("/games/{game_id}/moves/", response_model=schemas.GameMove)
-async def add_move(game_id: str, move: schemas.GameMoveCreate, db: AsyncSession = Depends(get_db)):
-    db_move = await crud.add_move(db, move)
+@app.post("/games/{game_id}/moves/", response_model=list[schemas.GameMove])
+async def add_moves(
+    game_id: str,
+    moves: schemas.MovesInput,  # Example input for docs
+    db: AsyncSession = Depends(get_db),
+):
+    move_list = moves.get("moves", "").split()
+    enumerated_moves = utils.parse_and_enumerate_moves(game_id, move_list)
+    db_move = await crud.add_moves(db, game_id, enumerated_moves)
     return db_move
 
 # Endpoint to add a player to a game

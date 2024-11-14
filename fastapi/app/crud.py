@@ -70,13 +70,25 @@ async def get_player_by_lichess_id(db: AsyncSession, lichess_id: str):
     result = await db.execute(select(models.Player).filter(models.Player.lichess_id == lichess_id))
     return result.scalars().first()
 
-# Add a move to a game
-async def add_move(db: AsyncSession, move: schemas.GameMoveCreate):
-    db_move = models.GameMove(**move.dict())
-    db.add(db_move)
+# # Add a move to a game
+# async def add_move(db: AsyncSession, move: schemas.GameMoveCreate):
+#     db_move = models.GameMove(**move.dict())
+#     db.add(db_move)
+#     await db.commit()
+#     await db.refresh(db_move)
+#     return db_move
+
+# Add multiple moves to a game
+async def add_moves(db: AsyncSession, game_id: str, moves: list[dict]):
+    """
+    Bulk insert moves for a game.
+    """
+    # Map each move dictionary to the model
+    db_moves = [models.GameMove(**move) for move in moves]
+    
+    db.add_all(db_moves)
     await db.commit()
-    await db.refresh(db_move)
-    return db_move
+    return db_moves
 
 # # Add a player to a game
 # async def add_player_to_game(db: AsyncSession, game_id: str, player: schemas.GamePlayerCreate):

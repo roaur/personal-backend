@@ -34,7 +34,7 @@ class GameMove(Base):
     __tablename__ = 'game_moves'
     __table_args__ = {'schema': 'chess'}
     
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(String(255), ForeignKey('chess.games.game_id', ondelete='CASCADE'), nullable=False)
     move_number = Column(Integer, nullable=False)
     move = Column(Text, nullable=False)

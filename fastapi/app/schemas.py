@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
@@ -69,6 +69,14 @@ class GameMove(BaseModel):
 
     class Config:
         orm_mode = True
+
+# Schema for a list of moves
+class MovesInput(BaseModel):
+    moves: str = Field(
+        ...,
+        description="A space-separated string of chess moves in standard algebraic notation (e.g., 'e4 e5 Nf3').",
+        example="e4 e6 Nf3 c5",
+    )
 
 # GamePlayer (Relationship between game and players) Pydantic schema
 class GamePlayerCreate(BaseModel):
