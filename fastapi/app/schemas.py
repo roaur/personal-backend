@@ -43,13 +43,12 @@ class Game(BaseModel):
 
 # Player Pydantic schema
 class PlayerCreate(BaseModel):
-    lichess_id: str
+    player_id: str
     name: str
     flair: Optional[str] = None
 
 class Player(BaseModel):
-    id: int
-    lichess_id: str
+    player_id: str
     name: str
     flair: Optional[str] = None
 
@@ -73,15 +72,15 @@ class GameMove(BaseModel):
 
 # GamePlayer (Relationship between game and players) Pydantic schema
 class GamePlayerCreate(BaseModel):
-    lichess_game_id: str
-    player_id: int
+    game_id: str
+    player_id: str
     color: str
     rating_diff: Optional[int] = None
     rating: int
 
 class GamePlayer(BaseModel):
-    lichess_game_id: str
-    player_id: int
+    game_id: str
+    player_id: str
     color: str
     rating_diff: Optional[int] = None
     rating: int

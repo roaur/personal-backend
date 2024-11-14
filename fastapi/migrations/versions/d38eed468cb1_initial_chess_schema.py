@@ -42,11 +42,10 @@ def upgrade() -> None:
     schema='chess'
     )
     op.create_table('players',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('lichess_id', sa.String(length=255), nullable=False),
+    sa.Column('player_id', sa.String(length=255), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('flair', sa.String(length=255), nullable=True),
-    sa.PrimaryKeyConstraint('id'),
+    sa.PrimaryKeyConstraint('player_id'),
     schema='chess'
     )
     op.create_table('game_moves',
@@ -60,12 +59,12 @@ def upgrade() -> None:
     )
     op.create_table('game_players',
     sa.Column('game_id', sa.String(length=255), nullable=False),
-    sa.Column('player_id', sa.Integer(), nullable=False),
-    sa.Column('color', sa.String(length=5), nullable=False),
+    sa.Column('player_id', sa.Text(), nullable=False),
+    sa.Column('color', sa.Text, nullable=False),
     sa.Column('rating_diff', sa.Integer(), nullable=True),
     sa.Column('rating', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['game_id'], ['chess.games.game_id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['player_id'], ['chess.players.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['player_id'], ['chess.players.player_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('game_id', 'player_id'),
     schema='chess'
     )

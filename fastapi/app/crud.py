@@ -59,7 +59,7 @@ async def get_players_from_game(db: AsyncSession, lichess_id: str):
 
 # Create a new player
 async def create_player(db: AsyncSession, player: schemas.PlayerCreate):
-    db_player = models.Player(**player.dict())
+    db_player = models.Player(**player.model_dump())
     db.add(db_player)
     await db.commit()
     await db.refresh(db_player)
@@ -78,12 +78,31 @@ async def add_move(db: AsyncSession, move: schemas.GameMoveCreate):
     await db.refresh(db_move)
     return db_move
 
+# # Add a player to a game
+# async def add_player_to_game(db: AsyncSession, game_id: str, player: schemas.GamePlayerCreate):
+#     db_game_player = models.GamePlayer(**player.dict())
+#     db.add(db_game_player)
+#     await db.commit()
+#     await db.refresh(db_game_player)
+#     return db_game_player
+
 # Add a player to a game
 async def add_player_to_game(db: AsyncSession, game_id: str, player: schemas.GamePlayerCreate):
-    db_game_player = models.GamePlayer(**player.dict())
-    db.add(db_game_player)
+    player_data = player.model_dump() # convert to dict
+    statement = insert(models.GamePlayer).values(**player_data).on_conflict_do_nothing(
+        index_elements=['game_id','player_id']
+    )
+    await db.execute(statement)
     await db.commit()
-    await db.refresh(db_game_player)
+
+    result = await db.execute(
+        select(models.GamePlayer).where( # where is more verbose than filter_by
+            models.GamePlayer.game_id == player_data['game_id'],
+            models.GamePlayer.player_id == player_data['player_id']
+        )
+    )
+
+    db_game_player = result.scalar_one_or_none()
     return db_game_player
 
 # Get the most recent lastMoveAt in unix milliseconds from the games table

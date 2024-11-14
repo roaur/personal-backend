@@ -7,8 +7,7 @@ class Player(Base):
     __tablename__ = 'players'
     __table_args__ = {'schema': 'chess'}
     
-    id = Column(BigInteger, unique=True, nullable=False, primary_key=True)
-    lichess_id = Column(String(255), unique=True, nullable=False)
+    player_id = Column(Text, unique=True, nullable=False, primary_key=True)
     name = Column(String(255), nullable=False)
     flair = Column(String(255))
 
@@ -48,7 +47,7 @@ class GamePlayer(Base):
     )
     
     game_id = Column(String(255), ForeignKey('chess.games.game_id', ondelete='CASCADE'), nullable=False)
-    player_id = Column(Integer, ForeignKey('chess.players.id', ondelete='CASCADE'), nullable=False)
-    color = Column(String(5), nullable=False)
+    player_id = Column(Text, ForeignKey('chess.players.player_id', ondelete='CASCADE'), nullable=False)
+    color = Column(Text, nullable=False)
     rating_diff = Column(Integer)
     rating = Column(Integer)
