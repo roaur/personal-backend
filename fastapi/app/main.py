@@ -64,7 +64,7 @@ async def get_player(lichess_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Player not found")
     return db_player
 
-# Endpoint to add a move to a game
+# Endpoint to add moves to a game
 @app.post("/games/{game_id}/moves/", response_model=list[schemas.GameMove])
 async def add_moves(
     game_id: str,
