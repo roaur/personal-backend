@@ -2,6 +2,7 @@ import berserk
 from config import settings
 from typing import Dict, List, Tuple, Generator
 import json
+import chess
 from datetime import datetime
 import requests
 import time
@@ -45,47 +46,36 @@ def setup_berserk_client() -> TokenSession:
     session.mount("https://", adapter)
     return session
 
+def json_serializer(json_to_post: dict) -> dict:
+    if isinstance(json_to_post, datetime):
+        return json_to_post.isoformat()
 
-def stream_matches(
-        username: str = None, 
-        max_matches: int = None, 
-        since: datetime = None
-    ) -> Generator[Dict, None, None]:
+def parse_and_enumerate_moves(game_id: str, moves: list[str]) -> list[dict]:
     """
-    Stream matches for the given username, limited by max_matches.
-    Uses default username and max matches from settings if not provided.
+    Parses and enumerates a list of chess moves.
     """
-    username = username or settings.lichess_username
-    max_matches = max_matches or settings.max_matches
-    
-    client = setup_berserk_client()
-    if since:
-        for match in client.games.export_by_player(
-                username=username, 
-                max=max_matches, 
-                as_pgn=False, 
-                moves=True, 
-                since=since,
-                opening=True,
-            ):
-            yield match
-    else:
-        for match in client.games.export_by_player(
-                username=username, 
-                max=max_matches, 
-                as_pgn=False, 
-                moves=True,
-                opening=True,
-            ):
-            yield match
+    board = chess.Board()  # Create a new board instance
+    move_data = []
 
+    for move_number, move in enumerate(moves, start=1):
+        try:
+            board.push_san(move)  # Push the move to the board (validates the move)
+            move_data.append({
+                "game_id": game_id,
+                "move_number": move_number,
+                "move": move,
+            })
+        except ValueError as e:
+            raise ValueError(f"Invalid move '{move}' at move number {move_number}: {str(e)}")
+
+    return move_data
 
 def format_match_core(game: Dict) -> Dict:
     """
     Extract core game information for the main game table.
     """
     return {
-        "lichess_game_id": game["id"],
+        "game_id": game["id"],
         "rated": game.get("rated", False),
         "variant": game["variant"],
         "speed": game["speed"],
@@ -145,6 +135,8 @@ def extract_moves_from_game(game: dict):
 def extract_players_from_game(game: dict):
     """Extract the white and black player information from the game object."""
     
+    game_id = game.get('game_id', '')
+
     players = game.get('players', {})
     if not players:
         raise ValueError("No players found in the game object.")
@@ -167,7 +159,7 @@ def extract_players_from_game(game: dict):
         "flair": players['black'].get('flair', None)
     }
 
-    return white_player, black_player
+    return game_id, white_player, black_player
 
 def link_players_to_game(game: dict):
     """Prepare the many-to-many link data for players and game from the game object."""
