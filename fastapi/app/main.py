@@ -71,7 +71,8 @@ async def add_moves(
     moves: schemas.MovesInput,  # Example input for docs
     db: AsyncSession = Depends(get_db),
 ):
-    move_list = moves.get("moves", "").split()
+    game_moves = moves.model_dump()
+    move_list = game_moves.get("moves", "").split()
     enumerated_moves = utils.parse_and_enumerate_moves(game_id, move_list)
     db_move = await crud.add_moves(db, game_id, enumerated_moves)
     return db_move

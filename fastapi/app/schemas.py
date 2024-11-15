@@ -57,13 +57,13 @@ class Player(BaseModel):
 
 # GameMove Pydantic schema
 class GameMoveCreate(BaseModel):
-    lichess_game_id: str
+    game_id: str
     move_number: int
     move: str
 
 class GameMove(BaseModel):
     id: int
-    lichess_game_id: str
+    game_id: str
     move_number: int
     move: str
 
