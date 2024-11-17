@@ -53,10 +53,15 @@ services:
 
 # Airflow Scheduler
   airflow-scheduler:
-    build: ./airflow  # Path to Airflow Dockerfile
+    build: 
+      context: .
+      dockerfile: ./airflow/Dockerfile  # Path to Airflow Dockerfile
     depends_on:
       - postgres_airflow
+    env_file:
+      - .env  # This ensures the environment variables are loaded
     environment:
+      PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@postgres_airflow/${AIRFLOW_POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
@@ -74,11 +79,16 @@ services:
 
   # Airflow Webserver
   airflow-webserver:
-    build: ./airflow
+    build: 
+      context: .
+      dockerfile: ./airflow/Dockerfile  # Path to Airflow Dockerfile
     depends_on:
       - airflow-scheduler
       - postgres_airflow
+    env_file:
+      - .env  # This ensures the environment variables are loaded
     environment:
+      PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@postgres_airflow/${AIRFLOW_POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'

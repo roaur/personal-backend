@@ -1,7 +1,7 @@
 import psycopg
 from psycopg.rows import dict_row
 import requests
-from config import settings
+from airflow.utils.config import settings
 from typing import Dict
 import logging
 

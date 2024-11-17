@@ -9,14 +9,14 @@ from urllib3 import Retry
 import berserk
 import datetime
 
-from ..lichess_utils import setup_berserk_client
+from utils.lichess_utils import setup_berserk_client, parse_and_enumerate_moves
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 10
 BACKOFF_FACTOR = 2
 
-import config
+import utils.config as config
 
 settings = config.settings
 
@@ -87,6 +87,23 @@ def lichess():
         def assign_player_to_match(player: dict, game_id: str):
             """
             Take a player object and assign it to a match via api
+            """
+            pass
+
+        @task
+        def extract_moves(match: dict) -> List[dict]:
+            """
+            Extract moves from lichess object. Return list of dicts.
+            """
+            move_list = match.get("moves", "").split()
+            game_id = match["game_id"]
+            output = parse_and_enumerate_moves(game_id, move_list)
+            return output
+
+        @task
+        def write_moves(moves: List[dict], game_id: str):
+            """
+            Take the list of moves and assign them to their match via API.
             """
             pass
 

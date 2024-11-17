@@ -1,5 +1,5 @@
 import berserk
-from config import settings
+from utils.config import settings
 from typing import Dict, List, Tuple, Generator
 import json
 import chess
