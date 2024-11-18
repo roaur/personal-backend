@@ -9,9 +9,19 @@ from urllib3 import Retry
 import berserk
 import datetime
 
-from utils.lichess_utils import setup_berserk_client, parse_and_enumerate_moves
+from utils.lichess_utils import (
+    setup_berserk_client, 
+    parse_and_enumerate_moves,
+    format_match_core,
+    post_game,
+    extract_players_from_game,
+    post_moves_to_match,
+    post_player,
+    post_player_to_match
+)
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 MAX_RETRIES = 10
 BACKOFF_FACTOR = 2
@@ -25,19 +35,9 @@ settings = config.settings
     start_date=days_ago(1),  # Allows the DAG to backfill if needed
     catchup=False,  # Don't execute past runs automatically
     tags=["lichess"],
+    is_paused_upon_creation=False,
 )
-def lichess():
-
-    @task
-    def get_client() -> berserk.Client:
-        """
-        Initialize the berserk client using the Lichess token from settings
-        and make the lichess-specific rate-limiting rules as an adapter.
-        """
-        session = setup_berserk_client()
-        client = berserk.Client(session)
-        return client
-    
+def lichess():   
     @task
     def get_last_move_time() -> int:
         url = "http://fastapi:8000/games/get_last_move_played_time"
@@ -48,12 +48,17 @@ def lichess():
         return output['last_move_time']
 
     @task
-    def get_matches(client: berserk.Client, start: int) -> List[dict]:
-        games = [{}]
-        games = client.games.export_by_player(settings.lichess_username, since=start, max=100)
+    def get_matches(start: int) -> List[dict]:
+        """
+        Fetch matches from Lichess using the client and a given start time.
+        """
+        session = setup_berserk_client()
+        client = berserk.Client(session)
+        games = client.games.export_by_player(settings.lichess_username, since=start, max=100, sort="dateAsc")
         matches = [game for game in games]
-        logger.info("Fetches %s matches", len(matches))
+        logger.info("Fetched %s matches", len(matches))
         return matches
+    
     
     @task_group
     def process_matches(matches: List[dict]):
@@ -62,54 +67,82 @@ def lichess():
         writing them to the database, extracting moves, writing them to the database
         """
 
-        @task
-        def write_games(matche: dict):
-            """
-            Take match, serialize it, then post to api.
-            """
-            
 
-        @task
-        def extract_players(match: dict) -> List[dict]:
-            """
-            Take match, extract players, return list of players.
-            """
-            pass
+    @task_group
+    def process_matches(matches: List[dict]):
+        """
+        Process matches by writing to database, extracting players,
+        writing them to the database, extracting moves, writing them to the database
+        """
 
-        @task
-        def write_players(player: dict):
-            """
-            Use the api and write this player to the database
-            """
-            pass
-
-        @task
-        def assign_player_to_match(player: dict, game_id: str):
-            """
-            Take a player object and assign it to a match via api
-            """
-            pass
-
-        @task
-        def extract_moves(match: dict) -> List[dict]:
-            """
-            Extract moves from lichess object. Return list of dicts.
-            """
-            move_list = match.get("moves", "").split()
-            game_id = match["game_id"]
-            output = parse_and_enumerate_moves(game_id, move_list)
-            return output
-
-        @task
-        def write_moves(moves: List[dict], game_id: str):
-            """
-            Take the list of moves and assign them to their match via API.
-            """
-            pass
-
-    
-
-
+    @task
+    def write_game(match: dict):
+        """
+        Take match, serialize it, then post to api.
+        """
+        post_game(match)
         
 
+    @task
+    def extract_players(match: dict) -> List[dict]:
+        """
+        Take match, extract players, return list of players.
+        """
+        white_player, black_player = extract_players_from_game(match)
+        return [white_player, black_player]
 
+    @task
+    def write_player(player: dict):
+        """
+        Use the api and write this player to the database
+        """
+        post_player(player)
+
+    @task
+    def assign_player_to_match(player: dict, game_id: str):
+        """
+        Take a player object and assign it to a match via api
+        """
+        post_player_to_match(player, game_id)
+
+    @task
+    def extract_moves(match: dict) -> List[dict]:
+        """
+        Extract moves from lichess object. Return list of dicts.
+        """
+        move_list = match.get("moves", "").split()
+        return move_list
+
+    @task
+    def write_moves(moves: List[dict], game_id: str):
+        """
+        Take the list of moves and assign them to their match via API.
+        """
+        post_moves_to_match(moves, game_id)
+
+    @task
+    def process_match(match: Dict):
+        """Process a single match: write the game, players, and moves."""
+        # logger.debug("Match: %s", match)
+        game_id = match["id"]
+        post_game(match)
+
+        # Process players
+        white_player, black_player = extract_players_from_game(match)
+        post_player(white_player)
+        post_player_to_match(white_player, game_id, "white")
+        post_player(black_player)
+        post_player_to_match(black_player, game_id, "black")
+
+        # Process moves
+        move_list = {"moves": match["moves"]}
+        post_moves_to_match(move_list, game_id)
+
+    # Define DAG flow
+    last_move_time = get_last_move_time()
+    matches = get_matches(last_move_time)
+
+    # Use dynamic task mapping to process each match
+    process_match.expand(match=matches)
+
+lichess()
