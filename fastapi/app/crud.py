@@ -59,11 +59,18 @@ async def get_players_from_game(db: AsyncSession, lichess_id: str):
 
 # Create a new player
 async def create_player(db: AsyncSession, player: schemas.PlayerCreate):
-    db_player = models.Player(**player.model_dump())
-    db.add(db_player)
+    player_data = player.model_dump()
+    statement = insert(models.Player).values(**player_data).on_conflict_do_nothing(
+        index_elements=['player_id']
+    )
+    await db.execute(statement)
     await db.commit()
-    await db.refresh(db_player)
-    return db_player
+
+    result = await db.execute(
+        select(models.Player).filter_by(player_id=player_data['player_id'])
+    )
+    return result.scalar_one()
+
 
 # Get a player by Lichess ID
 async def get_player_by_lichess_id(db: AsyncSession, lichess_id: str):
