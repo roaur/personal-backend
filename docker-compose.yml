@@ -11,11 +11,10 @@ services:
       - ./postgres/initdb:/docker-entrypoint-initdb.d/
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d db -U user"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 1s
       retries: 10
 
-  # Airflow Postgres service
   postgres_airflow:
     image: postgres:17
     environment:
@@ -23,11 +22,11 @@ services:
       POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
       POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
     ports:
-      - "5433:5432"  # Exposing it on a different port to avoid conflicts with FastAPI Postgres
+      - "5433:5432"
     volumes:
       - postgres_airflow_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d db -U user"]
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
       interval: 1s
       retries: 10
 
@@ -36,30 +35,28 @@ services:
       context: .
       dockerfile: ./fastapi/Dockerfile
     env_file:
-      - .env  # This ensures the environment variables are loaded
+      - .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: postgres
-      SQLALCHEMY_DATABASE_URL: postgresql+psycopg:///${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "8000:8000"
-    # volumes:
-    #   - ./fastapi:/app  # Mount your FastAPI code
 
-# Airflow Scheduler
   airflow-scheduler:
     build: 
       context: .
-      dockerfile: ./airflow/Dockerfile  # Path to Airflow Dockerfile
+      dockerfile: ./airflow/Dockerfile
     depends_on:
-      - postgres_airflow
+      postgres_airflow:
+        condition: service_healthy
     env_file:
-      - .env  # This ensures the environment variables are loaded
+      - .env
     environment:
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -68,8 +65,8 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__WEBSERVER__WORKERS: 4
     volumes:
-      - ./airflow/dags:/opt/airflow/dags  # Mount the DAGs
-      - ./airflow/utils:/opt/airflow/utils  # Mount the utils
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/utils:/opt/airflow/utils
       - airflow_logs:/opt/airflow/logs
       - airflow_plugins:/opt/airflow/plugins
     entrypoint: >
@@ -77,16 +74,15 @@ services:
       airflow db init &&
       airflow scheduler"
 
-  # Airflow Webserver
   airflow-webserver:
     build: 
       context: .
-      dockerfile: ./airflow/Dockerfile  # Path to Airflow Dockerfile
+      dockerfile: ./airflow/Dockerfile
     depends_on:
-      - airflow-scheduler
-      - postgres_airflow
+      postgres_airflow:
+        condition: service_healthy
     env_file:
-      - .env  # This ensures the environment variables are loaded
+      - .env
     environment:
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -100,7 +96,7 @@ services:
       AIRFLOW_WEB_ROLE: ${AIRFLOW_WEB_ROLE}
       AIRFLOW_WEB_EMAIL: ${AIRFLOW_WEB_EMAIL}
     ports:
-      - "8080:8080"  # Airflow webserver port
+      - "8080:8080"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/utils:/opt/airflow/utils
@@ -108,6 +104,7 @@ services:
       - airflow_plugins:/opt/airflow/plugins
     entrypoint: >
       bash -c "
+      sleep 5 &&
       airflow db init &&
       airflow users create --username ${AIRFLOW_WEB_USERNAME} --password ${AIRFLOW_WEB_PASSWORD} --firstname ${AIRFLOW_WEB_FIRST_NAME} --lastname ${AIRFLOW_WEB_LAST_NAME} --role ${AIRFLOW_WEB_ROLE} --email ${AIRFLOW_WEB_EMAIL} &&
       airflow webserver"
