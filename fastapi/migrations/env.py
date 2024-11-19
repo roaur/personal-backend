@@ -37,7 +37,7 @@ postgres_host = os.getenv("POSTGRES_HOST", "localhost")
 #     # If it fails, switch to 'localhost' for host machine
 #     postgres_host = "localhost"
 
-db_url = f"postgresql+psycopg://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{postgres_host}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB')}"
+db_url = f"postgresql+psycopg2://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{postgres_host}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB')}"
 
 print(f"POSTGRES_USER={os.getenv('POSTGRES_USER')}")
 print(f"POSTGRES_PASSWORD={os.getenv('POSTGRES_PASSWORD')}")
