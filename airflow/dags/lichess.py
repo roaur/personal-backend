@@ -54,7 +54,7 @@ def lichess():
         """
         session = setup_berserk_client()
         client = berserk.Client(session)
-        games = client.games.export_by_player(settings.lichess_username, since=start, max=100, sort="dateAsc")
+        games = client.games.export_by_player(settings.lichess_username, since=start, max=100, sort="dateAsc", pgn_in_json=True)
         matches = [game for game in games]
         logger.info("Fetched %s matches", len(matches))
         return matches
