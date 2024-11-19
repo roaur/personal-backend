@@ -1,6 +1,6 @@
 import uvicorn
 import sys
-from fastapi import FastAPI, Depends, HTTPException, Body
+from fastapi import FastAPI, Depends, HTTPException, Body, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app import schemas, crud, database, settings, utils
 
@@ -37,7 +37,7 @@ async def get_db():
             await db.close()
 
 # Endpoint to create a new game
-@app.post("/games/", response_model=schemas.Game)
+@app.post("/games/", response_model=schemas.Game, status_code=status.HTTP_201_CREATED)
 async def create_game(game: schemas.GameCreate, db: AsyncSession = Depends(get_db)):
     logger.debug(game)
     db_game = await crud.create_game(db, game)
@@ -51,7 +51,7 @@ async def get_games(skip: int = 0, limit: int = 10, db: AsyncSession = Depends(g
     return games
 
 # Endpoint to create a new player
-@app.post("/players/", response_model=schemas.Player)
+@app.post("/players/", response_model=schemas.Player, status_code=status.HTTP_201_CREATED)
 async def create_player(player: schemas.PlayerCreate, db: AsyncSession = Depends(get_db)):
     db_player = await crud.create_player(db, player)
     return db_player
@@ -65,7 +65,7 @@ async def get_player(lichess_id: str, db: AsyncSession = Depends(get_db)):
     return db_player
 
 # Endpoint to add moves to a game
-@app.post("/games/{game_id}/moves/", response_model=list[schemas.GameMove])
+@app.post("/games/{game_id}/moves/", response_model=list[schemas.GameMove], status_code=status.HTTP_201_CREATED)
 async def add_moves(
     game_id: str,
     moves: schemas.MovesInput,  # Example input for docs
@@ -78,7 +78,7 @@ async def add_moves(
     return db_move
 
 # Endpoint to add a player to a game
-@app.post("/games/{game_id}/players/", response_model=schemas.GamePlayer)
+@app.post("/games/{game_id}/players/", response_model=schemas.GamePlayer, status_code=status.HTTP_201_CREATED)
 async def add_player_to_game(game_id: str, player: schemas.GamePlayerCreate, db: AsyncSession = Depends(get_db)):
     db_game_player = await crud.add_player_to_game(db, game_id, player)
     return db_game_player
