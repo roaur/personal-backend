@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Text, TIMESTAMP, PrimaryKeyConstraint, BigInteger
+from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Text, TIMESTAMP, PrimaryKeyConstraint, Numeric
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -51,3 +51,24 @@ class GamePlayer(Base):
     color = Column(Text, nullable=False)
     rating_diff = Column(Integer)
     rating = Column(Integer)
+
+class Metric(Base):
+    __tablename__ = 'metric'
+    __table_args__ = (
+        {'schema': 'chess'}
+    )
+
+    metric_id = Column(Text, primary_key=True)
+    metric_name = Column(Text, unique=True, nullable=False)
+    metric_description = Column(Text, unique=True)
+
+class GameMetric(Base):
+    __tablename__ = 'game_metric'
+    __table_args__ = (
+        PrimaryKeyConstraint('game_id', 'metric_id'),
+        {'schema': 'chess'}
+    )
+
+    game_id = Column(Text, ForeignKey('chess.games.game_id', ondelete='CASCADE'), nullable=False)
+    metric_id = Column(Text, ForeignKey('chess.metric.metric_id', ondelete='CASCADE'), nullable=False)
+    metric_value = Column(Numeric)
