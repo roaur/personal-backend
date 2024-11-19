@@ -58,67 +58,6 @@ def lichess():
         matches = [game for game in games]
         logger.info("Fetched %s matches", len(matches))
         return matches
-    
-    
-    @task_group
-    def process_matches(matches: List[dict]):
-        """
-        Process matches by writing to database, extracting players,
-        writing them to the database, extracting moves, writing them to the database
-        """
-
-
-    @task_group
-    def process_matches(matches: List[dict]):
-        """
-        Process matches by writing to database, extracting players,
-        writing them to the database, extracting moves, writing them to the database
-        """
-
-    @task
-    def write_game(match: dict):
-        """
-        Take match, serialize it, then post to api.
-        """
-        post_game(match)
-        
-
-    @task
-    def extract_players(match: dict) -> List[dict]:
-        """
-        Take match, extract players, return list of players.
-        """
-        white_player, black_player = extract_players_from_game(match)
-        return [white_player, black_player]
-
-    @task
-    def write_player(player: dict):
-        """
-        Use the api and write this player to the database
-        """
-        post_player(player)
-
-    @task
-    def assign_player_to_match(player: dict, game_id: str):
-        """
-        Take a player object and assign it to a match via api
-        """
-        post_player_to_match(player, game_id)
-
-    @task
-    def extract_moves(match: dict) -> List[dict]:
-        """
-        Extract moves from lichess object. Return list of dicts.
-        """
-        move_list = match.get("moves", "").split()
-        return move_list
-
-    @task
-    def write_moves(moves: List[dict], game_id: str):
-        """
-        Take the list of moves and assign them to their match via API.
-        """
-        post_moves_to_match(moves, game_id)
 
     @task
     def process_match(match: Dict):
