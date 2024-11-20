@@ -58,7 +58,7 @@ class Metric(Base):
         {'schema': 'chess'}
     )
 
-    metric_id = Column(Text, primary_key=True)
+    metric_id = Column(Integer, primary_key=True)
     metric_name = Column(Text, unique=True, nullable=False)
     metric_description = Column(Text, unique=True)
 
