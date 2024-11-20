@@ -2,7 +2,7 @@ import uvicorn
 import sys
 from fastapi import FastAPI, Depends, HTTPException, Body, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app import schemas, crud, database, settings, utils
+from app import schemas, crud, database, utils
 
 import logging
 
