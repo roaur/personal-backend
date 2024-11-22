@@ -6,6 +6,7 @@ from typing import Optional
 class Settings(BaseSettings):
     lichess_username: str = Field(..., env="LICHESS_USERNAME")
     lichess_token: str = Field(..., env="LICHESS_TOKEN")
+    fastapi_route: str = Field(..., env="LICHESS_TOKEN")
 
     class Config:
         env_file = ".env"  # Optional: load other environment variables from a .env file

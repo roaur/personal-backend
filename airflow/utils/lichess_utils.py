@@ -214,22 +214,22 @@ def post_game(game: dict):
     logger.debug(f"[post_game] - Initial match data: {json.dumps(json_serializer(game), indent=2)}")
     game_data = format_match_core(game)
     logger.debug(f"[post_game] - Posting game: {json.dumps(json_serializer(game_data), indent=2)}")
-    url = "http://fastapi:8000/games/"
+    url = "http://{settings.fastapi_route}/games/"
     post_with_retry(url, game_data)
 
 def post_player(player: dict):
     logger.debug(f"[post_player] - Posting player: {json.dumps(json_serializer(player), indent=2)}")
-    url = "http://fastapi:8000/players/"
+    url = "http://{settings.fastapi_route}/players/"
     post_with_retry(url, player)
 
 def post_player_to_match(player: dict, game_id: str, colour: str):
     logger.debug(f"[post_player_to_match] - Posting player to {game_id}: {json.dumps(json_serializer(player), indent=2)}")
-    url = f"http://fastapi:8000/games/{game_id}/players"
+    url = f"http://{settings.fastapi_route}/games/{game_id}/players"
     player["game_id"] = game_id # Add game_id because the schema wants it.
     player["color"] = colour
     post_with_retry(url, player)
 
 def post_moves_to_match(moves: dict, game_id: str):
     logger.debug(f"[post_moves_to_match] - Posting moves to {game_id}: {json.dumps(json_serializer(moves), indent=2)}")
-    url = f"http://fastapi:8000/games/{game_id}/moves"
+    url = f"http://{settings.fastapi_route}/games/{game_id}/moves"
     post_with_retry(url, moves)
