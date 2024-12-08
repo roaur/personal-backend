@@ -34,10 +34,6 @@ services:
     build: 
       context: .
       dockerfile: ./fastapi/Dockerfile
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.fastapi.rule=Host(`${FASTAPI_ROUTE}`)"
-      - "traefik.http.services.fastapi.loadbalancer.server.port=8000" # FastAPI's internal port
     env_file:
       - .env
     environment:
@@ -82,10 +78,6 @@ services:
     build: 
       context: .
       dockerfile: ./airflow/Dockerfile
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.airflow.rule=Host(`${AIRFLOW_ROUTE}`)"
-      - "traefik.http.services.airflow.loadbalancer.server.port=8080" # Airflow's internal port
     depends_on:
       postgres_airflow:
         condition: service_healthy
@@ -116,20 +108,6 @@ services:
       airflow db init &&
       airflow users create --username ${AIRFLOW_WEB_USERNAME} --password ${AIRFLOW_WEB_PASSWORD} --firstname ${AIRFLOW_WEB_FIRST_NAME} --lastname ${AIRFLOW_WEB_LAST_NAME} --role ${AIRFLOW_WEB_ROLE} --email ${AIRFLOW_WEB_EMAIL} &&
       airflow webserver"
-
-  traefik:
-    image: traefik:v3.2
-    container_name: traefik
-    command:
-      - "--api.insecure=true" # Enable Traefik dashboard (disable in production!)
-      - "--providers.docker=true" # Enable Docker provider
-      - "--entrypoints.web.address=:80" # HTTP entrypoint
-    ports:
-      - "80:80" # Expose Traefik on port 80
-      - "8081:8080" # Dashboard
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro" # Allow Traefik to watch Docker
-      - "./traefik/traefik.yml:/etc/traefik/traefik.yml" # Correctly map the file
 
 volumes:
   airflow_logs:
