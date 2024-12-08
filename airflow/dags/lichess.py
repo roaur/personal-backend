@@ -40,7 +40,7 @@ settings = config.settings
 def lichess():   
     @task
     def get_last_move_time() -> int:
-        url = "http://{settings.fastapi_route}/games/get_last_move_played_time"
+        url = f"http://{settings.fastapi_route}/games/get_last_move_played_time"
         response = requests.get(url)
         response.raise_for_status()
         output = response.json()

@@ -214,12 +214,12 @@ def post_game(game: dict):
     logger.debug(f"[post_game] - Initial match data: {json.dumps(json_serializer(game), indent=2)}")
     game_data = format_match_core(game)
     logger.debug(f"[post_game] - Posting game: {json.dumps(json_serializer(game_data), indent=2)}")
-    url = "http://{settings.fastapi_route}/games/"
+    url = f"http://{settings.fastapi_route}/games/"
     post_with_retry(url, game_data)
 
 def post_player(player: dict):
     logger.debug(f"[post_player] - Posting player: {json.dumps(json_serializer(player), indent=2)}")
-    url = "http://{settings.fastapi_route}/players/"
+    url = f"http://{settings.fastapi_route}/players/"
     post_with_retry(url, player)
 
 def post_player_to_match(player: dict, game_id: str, colour: str):
