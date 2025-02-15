@@ -37,3 +37,9 @@ ENV PATH="${PYENV_ROOT}/bin:${PATH}"
 RUN echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \
     && echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc \
     && echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+
+# Build python 3.12.9
+RUN pyenv install 3.12.9
+
+# Now it's the global option
+RUN pyenv global 3.12.9
