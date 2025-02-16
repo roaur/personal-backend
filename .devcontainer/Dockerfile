@@ -33,13 +33,14 @@ RUN curl https://pyenv.run | bash
 ENV PYENV_ROOT="/home/vscode/.pyenv"
 ENV PATH="${PYENV_ROOT}/bin:${PATH}"
 
-# Ensure that every new shell session loads pyenv by adding initialization to .bashrc
+# Shells need to load pyenv and pyenv-virtualenv
 RUN echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \
     && echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc \
-    && echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+    && echo 'eval "$(pyenv init -)"' >> ~/.bashrc \
+    && echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
 
-# Build python 3.12.9
+# Build Python 3.12.9
 RUN pyenv install 3.12.9
 
-# Now it's the global option
+# Set it as the global Python version
 RUN pyenv global 3.12.9
