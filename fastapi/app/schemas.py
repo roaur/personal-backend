@@ -95,3 +95,10 @@ class LastMoveTimeResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class LastMoveTimePerPlayerResponse(BaseModel):
+    last_move_time: int # unix time in milliseconds
+    player_id: str
+
+    class Config:
+        orm_mode = True

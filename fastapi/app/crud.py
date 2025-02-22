@@ -133,3 +133,21 @@ async def get_last_move_time(db: AsyncSession) -> int:
     if last_move_time:
         return {"last_move_time": int(last_move_time.timestamp() * 1000)}  # Wrap in a dictionary
     return {"last_move_time": 0}  # Return 0 wrapped in a dictionary
+
+# Get the most recent lastMoveAt per player
+async def get_last_move_time_per_player(db: AsyncSession) -> dict:
+    result = await db.execute(
+        select(models.GamePlayer.player_id, 
+               func.max(models.Game.last_move_at).label("last_move_at")
+        )
+        .join(models.Game, models.Game.game_id == models.GamePlayer.game_id)
+        .group_by(models.GamePlayer.player_id)
+    )
+    last_move_times = result.all()
+
+    # return a dict for all player last move times
+    # if they don't have one dive 0 as their last move time.
+    return {
+        player_id: int(last_move_time.timestamp() * 1000) if last_move_time else 0
+        for player_id, last_move_time in last_move_times
+    }

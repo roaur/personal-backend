@@ -96,5 +96,11 @@ async def fetch_last_move_time(db: AsyncSession = Depends(get_db)):
     # Note: this will return 0 if there is no last move time
     return last_move_time
 
+# Endpoint to get the last move time from each player
+@app.get("/games/get_last_move_time_per_player", response_model=list[schemas.LastMoveTimePerPlayerResponse])
+async def fetch_last_move_time_per_player(db: AsyncSession = Depends(get_db)):
+    last_move_time_per_player = await crud.get_last_move_time_per_player(db)
+    return last_move_time_per_player
+
 ## TODO: Add endpoints that combine writing a game and players (or searching for players in the db)
 ## TODO: Handle incoming game PGNs. Split the records somehow to write to GameMove
