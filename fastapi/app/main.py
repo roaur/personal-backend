@@ -99,8 +99,14 @@ async def fetch_last_move_time(db: AsyncSession = Depends(get_db)):
 # Endpoint to get the last move time from each player
 @app.get("/games/get_last_move_time_per_player", response_model=list[schemas.LastMoveTimePerPlayerResponse])
 async def fetch_last_move_time_per_player(db: AsyncSession = Depends(get_db)):
-    last_move_time_per_player = await crud.get_last_move_time_per_player(db)
-    return last_move_time_per_player
+    last_player_moves = await crud.get_last_move_time_per_player(db)
+    return last_player_moves
+
+# Endpoint to get the last game start time for each player
+@app.get("/games/get_earliest_match_per_player", response_model=list[schemas.EarliestGameStartPerPlayerResponse])
+async def fetch_earliest_match_per_player(db: AsyncSession = Depends(get_db)):
+    earliest_player_matches = await crud.get_earliest_game_start_per_player(db)
+    return earliest_player_matches
 
 ## TODO: Add endpoints that combine writing a game and players (or searching for players in the db)
 ## TODO: Handle incoming game PGNs. Split the records somehow to write to GameMove

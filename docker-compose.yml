@@ -15,21 +15,20 @@ services:
       interval: 1s
       retries: 10
 
-  postgres-celery-result-backend:
-    image: postgres:17
-    environment:
-      POSTGRES_USER: ${CELERY_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${CELERY_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${CELERY_POSTGRES_DB}
-    ports:
-      - "5433:5432"
-    volumes:
-      - celery_postgres_init:/docker-entrypoint-initdb.d/
-      - celery_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${CELERY_POSTGRES_USER} -d ${CELERY_POSTGRES_DB}"]
-      interval: 1s
-      retries: 10
+  # postgres-celery-result-backend:
+  #   image: postgres:17
+  #   environment:
+  #     POSTGRES_USER: ${CELERY_POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${CELERY_POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${CELERY_POSTGRES_DB}
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - celery_postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${CELERY_POSTGRES_USER} -d ${CELERY_POSTGRES_DB}"]
+  #     interval: 1s
+  #     retries: 10
 
   fastapi:
     build: 
@@ -46,27 +45,44 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      memcached:
-        condition: service_healthy
     ports:
       - "8000:8000"
 
-  celery_beat:
-    build: 
-      context: .
-      dockerfile: ./celery/Dockerfile
-    env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${CELERY_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${CELERY_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${CELERY_POSTGRES_DB}
-      POSTGRES_HOST: postgres-celery-result-backend
-      SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${CELERY_POSTGRES_USER}:${CELERY_POSTGRES_PASSWORD}@postgres-celery-result-backend/${CELERY_POSTGRES_DB}
-    depends_on:
-      postgres-celery-result-backend:
-        condition: service_healthy
-    command: celery -A celery_worker.celery beat --loglevel=info
+  # celery_beat:
+  #   build: 
+  #     context: .
+  #     dockerfile: ./celery/Dockerfile
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     POSTGRES_USER: ${CELERY_POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${CELERY_POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${CELERY_POSTGRES_DB}
+  #     POSTGRES_HOST: postgres-celery-result-backend
+  #     SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${CELERY_POSTGRES_USER}:${CELERY_POSTGRES_PASSWORD}@postgres-celery-result-backend/${CELERY_POSTGRES_DB}
+  #     RMQ_HOST: rabbitmq:5672
+  #   depends_on:
+  #     postgres-celery-result-backend:
+  #       condition: service_healthy
+  #   command: celery -A celery_worker.celery beat --loglevel=info
+
+  # celery_worker:
+  #   build: 
+  #     context: .
+  #     dockerfile: ./celery/Dockerfile
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     POSTGRES_USER: ${CELERY_POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${CELERY_POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${CELERY_POSTGRES_DB}
+  #     POSTGRES_HOST: postgres-celery-result-backend
+  #     SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${CELERY_POSTGRES_USER}:${CELERY_POSTGRES_PASSWORD}@postgres-celery-result-backend/${CELERY_POSTGRES_DB}
+  #     RMQ_HOST: rabbitmq:5672
+  #   depends_on:
+  #     postgres-celery-result-backend:
+  #       condition: service_healthy
+  #   command: celery -A celery_worker.celery worker --loglevel=info
 
   rabbitmq:
     image: rabbitmq:management
@@ -89,5 +105,5 @@ services:
 
 volumes:
   postgres_data:
-  celery_postgres_data:
+  # celery_postgres_data:
   postgres_init:

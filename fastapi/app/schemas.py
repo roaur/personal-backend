@@ -102,3 +102,10 @@ class LastMoveTimePerPlayerResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class EarliestGameStartPerPlayerResponse(BaseModel):
+    game_start_time: int # unix time in milliseconds
+    player_id: str
+
+    class Config:
+        orm_mode = True

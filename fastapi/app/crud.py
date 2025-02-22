@@ -147,7 +147,30 @@ async def get_last_move_time_per_player(db: AsyncSession) -> dict:
 
     # return a dict for all player last move times
     # if they don't have one dive 0 as their last move time.
-    return {
-        player_id: int(last_move_time.timestamp() * 1000) if last_move_time else 0
+    # Convert result to list of JSON objects
+    response =  [
+        schemas.LastMoveTimePerPlayerResponse(
+            player_id=player_id,
+            last_move_time=int(last_move_time.timestamp() * 1000) if last_move_time else 0
+        )
         for player_id, last_move_time in last_move_times
-    }
+    ]
+    return response
+
+# get the earliest game start time per player
+async def get_earliest_game_start_per_player(db: AsyncSession) -> dict:
+    result = await db.execute(
+        select(models.GamePlayer.player_id,
+               func.min(models.Game.created_at).label("game_start_time"))
+    .join(models.Game, models.Game.game_id == models.GamePlayer.game_id)
+    .group_by(models.GamePlayer.player_id)
+    )
+    earliest_move_times = result.all()
+    response = [
+        schemas.EarliestGameStartPerPlayerResponse(
+            player_id = player_id,
+            game_start_time=int(game_start_time.timestamp() * 1000)
+        )
+        for player_id, game_start_time in earliest_move_times
+    ]
+    return response
