@@ -11,27 +11,12 @@ services:
       - ./postgres/initdb:/docker-entrypoint-initdb.d/
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 1s
-      retries: 10
-
-  postgres_airflow:
-    image: postgres:17
-    environment:
-      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_airflow_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 1s
       retries: 10
 
   fastapi:
-    build: 
+    build:
       context: .
       dockerfile: ./fastapi/Dockerfile
     env_file:
@@ -48,77 +33,48 @@ services:
     ports:
       - "8000:8000"
 
-  airflow-scheduler:
-    build: 
-      context: .
-      dockerfile: ./airflow/Dockerfile
-    depends_on:
-      postgres_airflow:
-        condition: service_healthy
+  celery_worker:
+    build:
+      context: ./celery
+      dockerfile: Dockerfile
+    command: celery -A tasks worker --loglevel=info
+    volumes:
+      - ./celery:/app
     env_file:
       - .env
     environment:
-      PYTHONPATH: /opt/airflow
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@postgres_airflow/${AIRFLOW_POSTGRES_DB}
-      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-      AIRFLOW__WEBSERVER__WORKERS: 4
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/utils:/opt/airflow/utils
-      - airflow_logs:/opt/airflow/logs
-      - airflow_plugins:/opt/airflow/plugins
-    entrypoint: >
-      bash -c "
-      airflow db init &&
-      airflow scheduler"
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - FASTAPI_ROUTE=fastapi:8000
+      - LICHESS_USERNAME=${LICHESS_USERNAME}
+      - LICHESS_TOKEN=${LICHESS_TOKEN}
+    depends_on:
+      - rabbitmq
+      - fastapi
 
-  airflow-webserver:
-    build: 
-      context: .
-      dockerfile: ./airflow/Dockerfile
-    depends_on:
-      postgres_airflow:
-        condition: service_healthy
+  celery_beat:
+    build:
+      context: ./celery
+      dockerfile: Dockerfile
+    command: celery -A tasks beat --loglevel=info
+    volumes:
+      - ./celery:/app
     env_file:
       - .env
     environment:
-      PYTHONPATH: /opt/airflow
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@postgres_airflow/${AIRFLOW_POSTGRES_DB}
-      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-      AIRFLOW_WEB_USERNAME: ${AIRFLOW_WEB_USERNAME}
-      AIRFLOW_WEB_PASSWORD: ${AIRFLOW_WEB_PASSWORD}
-      AIRFLOW_WEB_FIRST_NAME: ${AIRFLOW_WEB_FIRST_NAME}
-      AIRFLOW_WEB_LAST_NAME: ${AIRFLOW_WEB_LAST_NAME}
-      AIRFLOW_WEB_ROLE: ${AIRFLOW_WEB_ROLE}
-      AIRFLOW_WEB_EMAIL: ${AIRFLOW_WEB_EMAIL}
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/utils:/opt/airflow/utils
-      - airflow_logs:/opt/airflow/logs
-      - airflow_plugins:/opt/airflow/plugins
-    entrypoint: >
-      bash -c "
-      sleep 5 &&
-      airflow db init &&
-      airflow users create --username ${AIRFLOW_WEB_USERNAME} --password ${AIRFLOW_WEB_PASSWORD} --firstname ${AIRFLOW_WEB_FIRST_NAME} --lastname ${AIRFLOW_WEB_LAST_NAME} --role ${AIRFLOW_WEB_ROLE} --email ${AIRFLOW_WEB_EMAIL} &&
-      airflow webserver"
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - FASTAPI_ROUTE=fastapi:8000
+    depends_on:
+      - rabbitmq
+      - fastapi
 
   rabbitmq:
     image: rabbitmq:management
     container_name: rabbitmq
     ports:
-      - "5672:5672"  # RabbitMQ broker
+      - "5672:5672" # RabbitMQ broker
       - "15672:15672" # Management UI (http://localhost:15672)
 
-
 volumes:
-  airflow_logs:
-  airflow_plugins:
   postgres_data:
-  postgres_airflow_data:
+
+

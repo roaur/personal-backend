@@ -231,5 +231,5 @@ def post_player_to_match(player: dict, game_id: str, colour: str):
 
 def post_moves_to_match(moves: dict, game_id: str):
     logger.debug(f"[post_moves_to_match] - Posting moves to {game_id}: {json.dumps(json_serializer(moves), indent=2)}")
-    url = f"http://{settings.fastapi_route}/games/{game_id}/moves"
+    url = f"http://{settings.fastapi_route}/games/{game_id}/moves/"
     post_with_retry(url, moves)

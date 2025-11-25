@@ -16,6 +16,7 @@ cffi==1.17.1
 charset-normalizer==3.4.0
 chess==1.11.1
 click==8.1.7
+coloredlogs==15.0.1
 comm==0.2.2
 debugpy==1.8.7
 decorator==5.1.1

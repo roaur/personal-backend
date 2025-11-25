@@ -71,6 +71,9 @@ class MovesInput(BaseModel):
         description="A space-separated string of chess moves in standard algebraic notation (e.g., 'e4 e5 Nf3').",
         example="e4 e5 Nf3 Nc6",
     )
+    variant: Optional[str] = "standard"
+    initial_fen: Optional[str] = None
+
 
 # GamePlayer (Relationship between game and players) Pydantic schema
 class GamePlayerCreate(BaseModel):

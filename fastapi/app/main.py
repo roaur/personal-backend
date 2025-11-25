@@ -14,8 +14,11 @@ import logging
 app = FastAPI()
 # logger.debug("FastAPI application started!")
 
+import coloredlogs
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+coloredlogs.install(level='INFO', logger=logger)
+# logger.setLevel(logging.INFO)
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(funcName)s %(message)s")
 
 stream_handler = logging.StreamHandler(sys.stdout)
@@ -23,7 +26,7 @@ stream_handler.setFormatter(formatter)
 file_handler = logging.FileHandler("info.log")
 file_handler.setFormatter(formatter)
 
-logger.addHandler(stream_handler)
+# logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
 logger.info('API is starting up')
@@ -73,9 +76,15 @@ async def add_moves(
 ):
     game_moves = moves.model_dump()
     move_list = game_moves.get("moves", "").split()
-    enumerated_moves = utils.parse_and_enumerate_moves(game_id, move_list)
-    db_move = await crud.add_moves(db, game_id, enumerated_moves)
-    return db_move
+    variant = game_moves.get("variant", "standard")
+    initial_fen = game_moves.get("initial_fen")
+    try:
+        enumerated_moves = utils.parse_and_enumerate_moves(game_id, move_list, variant, initial_fen)
+        db_move = await crud.add_moves(db, game_id, enumerated_moves)
+        return db_move
+    except ValueError as e:
+        logger.warning(f"Skipping game {game_id} due to invalid move: {e}")
+        return []
 
 # Endpoint to add a player to a game
 @app.post("/games/{game_id}/players/", response_model=schemas.GamePlayer, status_code=status.HTTP_201_CREATED)

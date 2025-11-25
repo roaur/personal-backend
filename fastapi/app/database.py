@@ -30,7 +30,7 @@ logger.debug("FASTAPI DATABASE CONN: %s", DATABASE_URL)
 # DATABASE_URL = "postgresql+psycopg://user:password@postgres/db"
 
 # Create an async engine
-engine = create_async_engine(DATABASE_URL, future=True, echo=True)
+engine = create_async_engine(DATABASE_URL, future=True, echo=False)
 
 # Create a session factory for interacting with the database
 AsyncSessionLocal = sessionmaker(
