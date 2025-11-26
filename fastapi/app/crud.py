@@ -187,13 +187,13 @@ async def get_next_player_to_process(db: AsyncSession):
     
     Selection Criteria:
     1. Depth <= 1 (Main user or immediate opponents).
-    2. Has NOT been fetched in the last 24 hours.
+    2. Has NOT been fetched in the last 1 hour.
     
     Concurrency Safety:
     Uses `FOR UPDATE SKIP LOCKED` to ensure that if multiple orchestrators run,
     they don't pick the same player.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
     
     # Select with SKIP LOCKED to prevent race conditions
     stmt = select(models.Player).where(

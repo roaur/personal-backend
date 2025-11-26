@@ -22,18 +22,18 @@ import json
 # in a PostgreSQL database via a FastAPI backend.
 #
 # It uses a Producer-Consumer pattern to strictly adhere to Lichess API rate limits
-# (1 request/second) while maximizing data processing throughput.
+# (1 request at a time) while maximizing data processing throughput.
 #
 # Components:
 # 1. Orchestrator (Scheduler):
 #    - Runs every 60 seconds.
-#    - Identifies which players need to be updated (Main User + Opponents).
+#    - Identifies which players need to be updated (Main User then Opponents).
 #    - Dispatches `fetch_player_games` tasks to the `api_queue`.
 #
 # 2. Producer (`fetch_player_games`):
 #    - Queue: `api_queue` (Concurrency: 1).
 #    - Responsibility: Streams game data from Lichess API (NDJSON).
-#    - Constraint: MUST run serially to respect the 1 req/sec limit.
+#    - Constraint: MUST run serially to respect the 1 request at a time limit.
 #    - Mechanism: Uses a Redis distributed lock (`lichess_api_lock`) to ensure
 #      ABSOLUTELY NO CONCURRENT REQUESTS across the entire system, even if
 #      multiple producer workers are running.
@@ -57,16 +57,16 @@ app.conf.task_compression = 'gzip' # Compress messages to save Redis memory
 redis_client = redis.from_url(os.getenv('CELERY_BROKER_URL'))
 
 # Helper function to get last move time (for main user)
-def get_last_move_time() -> int:
+def get_last_move_time(username: str) -> int:
     """
-    Fetches the timestamp (ms) of the last move played by the main user
+    Fetches the timestamp (ms) of the last move played by the specified user
     from the database via FastAPI. Used as a cursor for fetching new games.
     """
-    url = f"http://{settings.fastapi_route}/games/get_last_move_played_time"
+    url = f"http://{settings.fastapi_route}/games/get_last_move_played_time/{username}"
     response = requests.get(url)
     response.raise_for_status()
     output = response.json()
-    logging.info("Last move time received: %s", output["last_move_time"])
+    logging.info(f"Last move time received for {username}: {output['last_move_time']}")
     return output['last_move_time']
 
 @app.on_after_configure.connect
@@ -94,7 +94,7 @@ def orchestrator():
     """
     # 1. Process Main User
     try:
-        last_move_time = get_last_move_time()
+        last_move_time = get_last_move_time(settings.lichess_username)
         # Trigger producer for main user
         # We use delay() to send the task to the queue
         fetch_player_games.delay(settings.lichess_username, since=last_move_time, depth=0)
@@ -148,6 +148,16 @@ def fetch_player_games(self, username: str, since: int, depth: int):
         }
         if since:
             params["since"] = int(since)
+        else:
+            # Idempotency: If 'since' is not provided, check the DB for the last move time.
+            # This ensures we don't re-fetch games we already have if the task is triggered manually or retried without context.
+            try:
+                last_db_time = get_last_move_time(username)
+                if last_db_time > 0:
+                    params["since"] = last_db_time
+                    logging.info(f"Idempotency: Resuming fetch for {username} from {last_db_time}")
+            except Exception as e:
+                logging.warning(f"Could not fetch last move time for {username}: {e}")
 
         # Fetch ONE batch of games
         # We removed the loop to allow "interleaving" of tasks for different users.

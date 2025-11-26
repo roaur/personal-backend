@@ -90,6 +90,14 @@ async def fetch_last_move_time(db: AsyncSession = Depends(get_db)):
     last_move_time = await crud.get_last_move_time(db)
     return last_move_time
 
+@app.get("/games/get_last_move_played_time/{player_id}", response_model=schemas.LastMoveTimeResponse)
+async def fetch_last_move_time_for_player(player_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Returns the timestamp of the most recent move for a specific player.
+    """
+    last_move_time = await crud.get_last_move_time_for_player(db, player_id)
+    return {"last_move_time": last_move_time}
+
 @app.post("/games/{game_id}/moves/", response_model=list[schemas.GameMove], status_code=status.HTTP_201_CREATED)
 async def add_moves(
     game_id: str,
