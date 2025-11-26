@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -10,10 +11,32 @@ services:
     volumes:
       - ./postgres/initdb:/docker-entrypoint-initdb.d/
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/postgres.conf:/etc/postgresql/postgresql.conf
+    command: [ "postgres", "-c", "config_file=/etc/postgresql/postgresql.conf" ]
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
-      interval: 1s
-      retries: 10
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgbouncer:
+    image: edoburu/pgbouncer
+    restart: always
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB}
+      AUTH_TYPE: plain
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+      LISTEN_PORT: 6432
+    ports:
+      - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   redis:
     image: redis:alpine
@@ -23,16 +46,19 @@ services:
   fastapi:
     build:
       context: .
-      dockerfile: ./fastapi/Dockerfile
-    env_file:
-      - .env
+      dockerfile: fastapi/Dockerfile
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_HOST: postgres
-      SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
     depends_on:
+      pgbouncer:
+        condition: service_started
       postgres:
         condition: service_healthy
     volumes:
@@ -44,57 +70,69 @@ services:
     build:
       context: ./celery
       dockerfile: Dockerfile
-    # Concurrency 1 for API rate limiting. Listens to 'api_queue' and default 'celery' (for orchestrator)
+    restart: always
+    # Concurrency 1 for Rate Limiting
     command: celery -A tasks worker -Q api_queue,celery --loglevel=info --concurrency=1 --hostname=producer@%h
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      LICHESS_TOKEN: ${LICHESS_TOKEN}
+      LICHESS_USERNAME: ${LICHESS_USERNAME}
+      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
+    depends_on:
+      - redis
+      - pgbouncer
     volumes:
       - ./celery:/app
-    env_file:
-      - .env
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - FASTAPI_ROUTE=fastapi:8000
-      - LICHESS_USERNAME=${LICHESS_USERNAME}
-      - LICHESS_TOKEN=${LICHESS_TOKEN}
-    depends_on:
-      - postgres
-      - fastapi
-      - redis
 
   celery_consumer:
     build:
       context: ./celery
       dockerfile: Dockerfile
-    # Concurrency 8 for parallel DB processing. Listens to 'db_queue'
+    restart: always
+    # Concurrency 8 for Parallel Processing
     command: celery -A tasks worker -Q db_queue --loglevel=info --concurrency=8 --hostname=consumer@%h
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      LICHESS_TOKEN: ${LICHESS_TOKEN}
+      LICHESS_USERNAME: ${LICHESS_USERNAME}
+      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
+    depends_on:
+      - redis
+      - pgbouncer
     volumes:
       - ./celery:/app
-    env_file:
-      - .env
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - FASTAPI_ROUTE=fastapi:8000
-      - LICHESS_USERNAME=${LICHESS_USERNAME}
-      - LICHESS_TOKEN=${LICHESS_TOKEN}
-    depends_on:
-      - postgres
-      - fastapi
-      - redis
 
   celery_beat:
     build:
       context: ./celery
       dockerfile: Dockerfile
+    restart: always
     command: celery -A tasks beat --loglevel=info
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      LICHESS_TOKEN: ${LICHESS_TOKEN}
+      LICHESS_USERNAME: ${LICHESS_USERNAME}
+      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
+    depends_on:
+      - redis
+      - pgbouncer
     volumes:
       - ./celery:/app
-    env_file:
-      - .env
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - FASTAPI_ROUTE=fastapi:8000
-    depends_on:
-      - postgres
-      - fastapi
 
 volumes:
   postgres_data:

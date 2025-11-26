@@ -36,7 +36,8 @@ graph LR
     Prod -->|Enqueue Game| Q2[(Redis: db_queue)]
     Q2 -->|Consume| Cons[Consumer (Concurrency 8)]
     Cons -->|Write| API[FastAPI]
-    API -->|Persist| DB[(PostgreSQL)]
+    API -->|Persist| PGB[PgBouncer]
+    PGB -->|Pool| DB[(PostgreSQL)]
 ```
 
 ## 📦 Services
@@ -48,7 +49,8 @@ graph LR
 | `celery_consumer` | Processing | Processes raw data and writes to DB. **Concurrency: 8**. |
 | `celery_beat` | Scheduler | Triggers the orchestrator every minute. |
 | `redis` | Broker | Message broker for Celery queues. |
-| `postgres` | Database | Persistent storage. |
+| `pgbouncer` | Connection Pool | Multiplexes DB connections for high performance. |
+| `postgres` | Database | Persistent storage (Optimized config). |
 
 ## ⚡ Quick Start
 

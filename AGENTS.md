@@ -41,6 +41,14 @@ This document outlines the architecture of the Personal Backend system, designed
     - Handles communication between Producer and Consumer services.
     - Stores Celery task queues (`api_queue`, `db_queue`).
 - **Tech**: Redis.
+    
+### 5. PgBouncer (`pgbouncer`)
+**Role**: The Gatekeeper (Connection Pooler).
+- **Responsibility**:
+    - Manages a pool of persistent connections to Postgres.
+    - Multiplexes thousands of client connections (from Celery/FastAPI) onto a few DB connections.
+    - Increases write throughput by reducing connection overhead.
+- **Tech**: PgBouncer.
 
 ## Data Flow
 
