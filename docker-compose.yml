@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -10,115 +11,130 @@ services:
     volumes:
       - ./postgres/initdb:/docker-entrypoint-initdb.d/
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/postgres.conf:/etc/postgresql/postgresql.conf
+    command: [ "postgres", "-c", "config_file=/etc/postgresql/postgresql.conf" ]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 1s
-      retries: 10
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  postgres_airflow:
-    image: postgres:17
+  pgbouncer:
+    image: edoburu/pgbouncer
+    restart: always
     environment:
-      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB}
+      AUTH_TYPE: plain
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+      LISTEN_PORT: 6432
     ports:
-      - "5433:5432"
-    volumes:
-      - postgres_airflow_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
-      interval: 1s
-      retries: 10
+      - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
 
   fastapi:
-    build: 
+    build:
       context: .
-      dockerfile: ./fastapi/Dockerfile
-    env_file:
-      - .env
+      dockerfile: fastapi/Dockerfile
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_HOST: postgres
-      SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
     depends_on:
+      pgbouncer:
+        condition: service_started
       postgres:
         condition: service_healthy
+    volumes:
+      - ./fastapi:/app
     ports:
       - "8000:8000"
 
-  airflow-scheduler:
-    build: 
-      context: .
-      dockerfile: ./airflow/Dockerfile
-    depends_on:
-      postgres_airflow:
-        condition: service_healthy
-    env_file:
-      - .env
+  celery_producer:
+    build:
+      context: ./celery
+      dockerfile: Dockerfile
+    restart: always
+    # Concurrency 1 for Rate Limiting
+    command: celery -A tasks worker -Q api_queue,celery --loglevel=info --concurrency=1 --hostname=producer@%h
     environment:
-      PYTHONPATH: /opt/airflow
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@postgres_airflow/${AIRFLOW_POSTGRES_DB}
-      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-      AIRFLOW__WEBSERVER__WORKERS: 4
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/utils:/opt/airflow/utils
-      - airflow_logs:/opt/airflow/logs
-      - airflow_plugins:/opt/airflow/plugins
-    entrypoint: >
-      bash -c "
-      airflow db init &&
-      airflow scheduler"
-
-  airflow-webserver:
-    build: 
-      context: .
-      dockerfile: ./airflow/Dockerfile
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      LICHESS_TOKEN: ${LICHESS_TOKEN}
+      LICHESS_USERNAME: ${LICHESS_USERNAME}
+      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
     depends_on:
-      postgres_airflow:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      PYTHONPATH: /opt/airflow
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@postgres_airflow/${AIRFLOW_POSTGRES_DB}
-      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-      AIRFLOW_WEB_USERNAME: ${AIRFLOW_WEB_USERNAME}
-      AIRFLOW_WEB_PASSWORD: ${AIRFLOW_WEB_PASSWORD}
-      AIRFLOW_WEB_FIRST_NAME: ${AIRFLOW_WEB_FIRST_NAME}
-      AIRFLOW_WEB_LAST_NAME: ${AIRFLOW_WEB_LAST_NAME}
-      AIRFLOW_WEB_ROLE: ${AIRFLOW_WEB_ROLE}
-      AIRFLOW_WEB_EMAIL: ${AIRFLOW_WEB_EMAIL}
-    ports:
-      - "8080:8080"
+      - redis
+      - pgbouncer
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/utils:/opt/airflow/utils
-      - airflow_logs:/opt/airflow/logs
-      - airflow_plugins:/opt/airflow/plugins
-    entrypoint: >
-      bash -c "
-      sleep 5 &&
-      airflow db init &&
-      airflow users create --username ${AIRFLOW_WEB_USERNAME} --password ${AIRFLOW_WEB_PASSWORD} --firstname ${AIRFLOW_WEB_FIRST_NAME} --lastname ${AIRFLOW_WEB_LAST_NAME} --role ${AIRFLOW_WEB_ROLE} --email ${AIRFLOW_WEB_EMAIL} &&
-      airflow webserver"
+      - ./celery:/app
 
-  rabbitmq:
-    image: rabbitmq:management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672"  # RabbitMQ broker
-      - "15672:15672" # Management UI (http://localhost:15672)
+  celery_consumer:
+    build:
+      context: ./celery
+      dockerfile: Dockerfile
+    restart: always
+    # Concurrency 8 for Parallel Processing
+    command: celery -A tasks worker -Q db_queue --loglevel=info --concurrency=8 --hostname=consumer@%h
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      LICHESS_TOKEN: ${LICHESS_TOKEN}
+      LICHESS_USERNAME: ${LICHESS_USERNAME}
+      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
+    depends_on:
+      - redis
+      - pgbouncer
+    volumes:
+      - ./celery:/app
 
+  celery_beat:
+    build:
+      context: ./celery
+      dockerfile: Dockerfile
+    restart: always
+    command: celery -A tasks beat --loglevel=info
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      LICHESS_TOKEN: ${LICHESS_TOKEN}
+      LICHESS_USERNAME: ${LICHESS_USERNAME}
+      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
+    depends_on:
+      - redis
+      - pgbouncer
+    volumes:
+      - ./celery:/app
 
 volumes:
-  airflow_logs:
-  airflow_plugins:
   postgres_data:
-  postgres_airflow_data:
+
+
