@@ -11,6 +11,8 @@ This project implements a **Producer-Consumer** architecture to efficiently fetc
 - **Parallel Processing**: Scalable consumer workers process and store games in parallel.
 - **Streaming**: Uses NDJSON streaming to process games immediately as they are downloaded.
 - **Graph Traversal**: Automatically discovers and fetches games for opponents to build a network of players.
+- **Complete History**: Automatically paginates to fetch **all games** for every player, not just the recent ones.
+- **Resumable**: Smart cursors ensure data collection resumes exactly where it left off after restarts or failures.
 - **Idempotency**: "Upsert" logic ensures data consistency even if tasks are retried.
 
 ## 🛠️ Tech Stack

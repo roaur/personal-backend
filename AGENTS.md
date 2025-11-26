@@ -23,6 +23,8 @@ This document outlines the architecture of the Personal Backend system, designed
         - **Constraint**: **Strictly serial execution** enforced by a **Global Redis Lock**.
         - **Guarantee**: Absolutely NO concurrent requests to Lichess, regardless of worker scale.
         - **Streaming**: Streams NDJSON responses and dispatches individual game tasks immediately.
+        - **Pagination**: Automatically loops to fetch *all* games for a player (handling >1000 games).
+        - **Resumable**: Uses `last_move_time` from the DB to resume fetching exactly where it left off.
     - **`celery_consumer`**:
         - **Queue**: `db_queue` (Concurrency: Scalable, e.g., 8).
         - **Job**: Processes raw game data and writes to Postgres via FastAPI.

@@ -166,6 +166,21 @@ async def create_players_batch(db: AsyncSession, players: list[schemas.PlayerCre
     result = await db.execute(select(models.Player).where(models.Player.player_id.in_(player_ids)))
     return result.scalars().all()
 
+async def get_last_move_time_for_player(db: AsyncSession, player_id: str) -> int:
+    """
+    Gets the timestamp of the most recent move for a specific player.
+    """
+    stmt = select(func.max(models.Game.last_move_at)).join(
+        models.GamePlayer, models.Game.game_id == models.GamePlayer.game_id
+    ).where(models.GamePlayer.player_id == player_id)
+    
+    result = await db.execute(stmt)
+    last_move_time = result.scalar()
+    
+    if last_move_time:
+        return int(last_move_time.timestamp() * 1000)
+    return 0
+
 async def get_next_player_to_process(db: AsyncSession):
     """
     Orchestrator Logic: Finds the next player to fetch games for.
@@ -202,11 +217,16 @@ async def get_next_player_to_process(db: AsyncSession):
         await db.commit()
         await db.refresh(player)
         
-        # Restore original time on the object so the worker gets the correct cursor
-        # (The worker needs to know when we LAST fetched to only get new games)
-        player.last_fetched_at = original_last_fetched_at
+        # Get the last move time for this player
+        last_move_time = await get_last_move_time_for_player(db, player.player_id)
+        
+        # Return player data + last_move_time
+        # We construct a dictionary that matches the PlayerProcessResponse schema
+        player_dict = player.__dict__.copy()
+        player_dict['last_move_time'] = last_move_time
+        return player_dict
     
-    return player
+    return None
 
 async def update_player_fetched_at(db: AsyncSession, player_id: str):
     """Updates the last_fetched_at timestamp for a player to NOW."""

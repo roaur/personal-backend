@@ -147,3 +147,10 @@ class LastMoveTimeResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class PlayerProcessResponse(Player):
+    """Schema for a player with their last move time."""
+    last_move_time: int # unix time in milliseconds
+
+    class Config:
+        orm_mode = True

@@ -109,11 +109,8 @@ def orchestrator():
             player = response.json()
             logging.info(f"Processing next player: {player['player_id']} (Depth {player['depth']})")
             
-            since = 0
-            if player.get('last_fetched_at'):
-                # Convert ISO string to timestamp (ms)
-                dt = datetime.fromisoformat(player['last_fetched_at'].replace('Z', '+00:00'))
-                since = int(dt.timestamp() * 1000)
+            # Use the last_move_time returned by the backend as the cursor
+            since = player.get('last_move_time', 0)
             
             # Trigger producer for opponent
             fetch_player_games.delay(player['player_id'], since=since, depth=player['depth'])
@@ -134,78 +131,97 @@ def fetch_player_games(self, username: str, since: int, depth: int):
     2. Connects to Lichess API `/api/games/user/{username}`.
     3. Uses streaming (NDJSON) to receive games line-by-line.
     4. For EACH game received, immediately dispatches a `process_game_data` task.
-    
-    This ensures that we never block on the API request and can process games
-    in parallel as they arrive.
     """
     logging.info(f"Fetching games for {username} since {since}")
     
-    # Use direct requests for explicit streaming control
+    lock = _acquire_lichess_lock(username)
+    if not lock:
+        logging.warning(f"Could not acquire Lichess API lock for {username}. Retrying...")
+        self.retry(countdown=10, max_retries=5)
+        return
+
+    try:
+        params = {
+            "max": 1000,
+            "sort": "dateAsc",
+            "pgnInJson": "true"
+        }
+        if since:
+            params["since"] = int(since)
+
+        # Fetch ONE batch of games
+        # We removed the loop to allow "interleaving" of tasks for different users.
+        # If there are more games, we re-queue the task.
+        
+        logging.info(f"Requesting games for {username} with params: {params}")
+        
+        count, last_game_time = _fetch_and_dispatch_batch(username, params, depth)
+        
+        # Pagination Logic:
+        # If we got the maximum number of games (1000), there are likely more.
+        # We re-queue the task with the new 'since' cursor.
+        if count >= params["max"]:
+            if last_game_time:
+                logging.info(f"Pagination: Re-queuing fetch for {username} starting from {last_game_time}")
+                # Dispatch new task to the back of the queue
+                fetch_player_games.delay(username, since=last_game_time, depth=depth)
+            else:
+                logging.warning("Pagination: Could not determine last game time. Stopping.")
+        
+    except Exception as e:
+        logging.error(f"Error fetching games for {username}: {e}")
+        self.retry(exc=e, countdown=10, max_retries=5)
+        
+    finally:
+        try:
+            lock.release()
+        except redis.LockError:
+            pass
+
+def _acquire_lichess_lock(username: str):
+    """Attempts to acquire the global Lichess API lock."""
+    lock = redis_client.lock("lichess_api_lock", timeout=300)
+    if lock.acquire(blocking=True, blocking_timeout=10):
+        return lock
+    return None
+
+def _fetch_and_dispatch_batch(username: str, params: dict, depth: int):
+    """
+    Fetches a single batch of games and dispatches them.
+    Returns (count, last_game_time).
+    """
     headers = {
         'Authorization': f'Bearer {settings.lichess_token}',
         'Accept': 'application/x-ndjson'
     }
-    
-    params = {
-        "max": 1000,          # Fetch up to 1000 games
-        "sort": "dateAsc",    # Oldest first (to maintain chronological order)
-        "pgnInJson": "true"   # Include PGN in the JSON response
-    }
-    if since:
-        params["since"] = int(since)
-        
     url = f"https://lichess.org/api/games/user/{username}"
     
-    # Distributed Lock: Ensure ONLY ONE request to Lichess happens at a time across ALL workers.
-    # We use a blocking lock with a timeout. 
-    # If we can't get the lock within 10 seconds, we retry later.
-    lock = redis_client.lock("lichess_api_lock", timeout=300) # 5 minute lock timeout (safety net)
+    count = 0
+    last_game_time = 0
+
+    with requests.get(url, headers=headers, params=params, stream=True) as response:
+        if response.status_code == 429:
+            logging.warning(f"Rate limit hit for {username}. Retrying in 60s.")
+            raise Exception("Rate limit hit")
+
+        response.raise_for_status()
+        
+        for line in response.iter_lines():
+            if line:
+                try:
+                    game = json.loads(line)
+                    process_game_data.delay(game, depth)
+                    count += 1
+                    
+                    if 'lastMoveAt' in game:
+                        last_game_time = game['lastMoveAt']
+                        
+                except json.JSONDecodeError as e:
+                    logging.error(f"Error decoding line: {e}")
     
-    have_lock = False
-    try:
-        # Try to acquire the lock, waiting up to 10 seconds
-        have_lock = lock.acquire(blocking=True, blocking_timeout=10)
-        
-        if not have_lock:
-            logging.warning(f"Could not acquire Lichess API lock for {username}. Retrying...")
-            raise Exception("Could not acquire lock") # Will trigger retry below
+    logging.info(f"Dispatched {count} games for {username}")
+    return count, last_game_time
 
-        # stream=True is critical here! It keeps the connection open and yields data chunks.
-        with requests.get(url, headers=headers, params=params, stream=True) as response:
-            if response.status_code == 429:
-                logging.warning(f"Rate limit hit for {username}. Retrying in 60s.")
-                # self.retry(countdown=60) # Optional: Retry logic
-                return
-
-            response.raise_for_status()
-            
-            count = 0
-            # Iterate line by line (NDJSON format)
-            for line in response.iter_lines():
-                if line:
-                    try:
-                        game = json.loads(line)
-                        # Dispatch to consumer immediately
-                        # This puts the heavy lifting (DB writes) onto the db_queue
-                        process_game_data.delay(game, depth)
-                        count += 1
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Error decoding line: {e}")
-            
-            logging.info(f"Dispatched {count} games for {username}")
-        
-    except Exception as e:
-        logging.error(f"Error fetching games for {username}: {e}")
-        # Retry with exponential backoff if we couldn't get the lock or failed
-        self.retry(exc=e, countdown=10, max_retries=5)
-        
-    finally:
-        if have_lock:
-            try:
-                lock.release()
-            except redis.LockError:
-                # Lock might have expired or already been released
-                pass
 @app.task(queue='db_queue')
 def process_game_data(game: dict, depth: int):
     """

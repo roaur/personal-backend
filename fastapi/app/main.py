@@ -128,7 +128,7 @@ async def create_players_batch(players: list[schemas.PlayerCreate], db: AsyncSes
     db_players = await crud.create_players_batch(db, players)
     return db_players
 
-@app.get("/players/process/next", response_model=schemas.Player)
+@app.get("/players/process/next", response_model=schemas.PlayerProcessResponse)
 async def get_next_player_to_process(db: AsyncSession = Depends(get_db)):
     """
     Orchestrator Endpoint: Returns the next player to fetch games for.
