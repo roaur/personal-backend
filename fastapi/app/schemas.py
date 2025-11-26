@@ -1,14 +1,35 @@
+"""
+Pydantic Schemas for API Data Validation.
+
+This module defines the data contracts (schemas) for the API using Pydantic.
+These schemas are used for:
+1. Request Body Validation (e.g., GameCreate).
+2. Response Serialization (e.g., Game).
+
+Naming Convention:
+- *Create: Used for POST requests (input).
+- [ModelName]: Used for responses (output), usually includes ORM mode.
+"""
+
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
-# Game Pydantic schema
+# =============================================================================
+# Game Schemas
+# =============================================================================
+
 class Clock(BaseModel):
+    """Nested schema for clock settings."""
     initial: int
     increment: int
     total_time: int
 
 class GameCreate(BaseModel):
+    """
+    Schema for creating a new game.
+    Matches the structure of the Lichess API response.
+    """
     game_id: str
     rated: bool
     variant: str
@@ -20,9 +41,13 @@ class GameCreate(BaseModel):
     source: str
     winner: Optional[str] = None
     pgn: Optional[str] = None
-    clock: Clock  # Keep clock as a nested object
+    clock: Clock  # Nested object in input
 
 class Game(BaseModel):
+    """
+    Schema for reading a game (Response).
+    Flattens the clock data for easier consumption.
+    """
     game_id: str
     rated: bool
     variant: str
@@ -34,6 +59,7 @@ class Game(BaseModel):
     source: Optional[str]
     winner: Optional[str]
     pgn: Optional[str]
+    # Flattened clock fields
     clock_initial: int
     clock_increment: int
     clock_total_time: int
@@ -41,8 +67,12 @@ class Game(BaseModel):
     class Config:
         orm_mode = True
 
-# Player Pydantic schema
+# =============================================================================
+# Player Schemas
+# =============================================================================
+
 class PlayerCreate(BaseModel):
+    """Schema for creating/updating a player."""
     player_id: str
     name: str
     flair: Optional[str] = None
@@ -50,6 +80,7 @@ class PlayerCreate(BaseModel):
     depth: Optional[int] = None
 
 class Player(BaseModel):
+    """Schema for reading a player."""
     player_id: str
     name: str
     flair: Optional[str] = None
@@ -59,7 +90,12 @@ class Player(BaseModel):
     class Config:
         orm_mode = True
 
+# =============================================================================
+# Move Schemas
+# =============================================================================
+
 class GameMove(BaseModel):
+    """Schema for a single move record."""
     id: int
     game_id: str
     move_number: int
@@ -68,8 +104,11 @@ class GameMove(BaseModel):
     class Config:
         orm_mode = True
 
-# Schema for a list of moves
 class MovesInput(BaseModel):
+    """
+    Schema for the 'add moves' endpoint input.
+    Accepts a raw space-separated string of moves.
+    """
     moves: str = Field(
         ...,
         description="A space-separated string of chess moves in standard algebraic notation (e.g., 'e4 e5 Nf3').",
@@ -79,8 +118,12 @@ class MovesInput(BaseModel):
     initial_fen: Optional[str] = None
 
 
-# GamePlayer (Relationship between game and players) Pydantic schema
+# =============================================================================
+# Game-Player Relationship Schemas
+# =============================================================================
+
 class GamePlayerCreate(BaseModel):
+    """Schema for linking a player to a game."""
     game_id: str
     player_id: str
     color: str
@@ -88,6 +131,7 @@ class GamePlayerCreate(BaseModel):
     rating: int
 
 class GamePlayer(BaseModel):
+    """Schema for reading a game-player link."""
     game_id: str
     player_id: str
     color: str
@@ -98,6 +142,7 @@ class GamePlayer(BaseModel):
         orm_mode = True
 
 class LastMoveTimeResponse(BaseModel):
+    """Schema for the last move time response."""
     last_move_time: int # unix time in milliseconds
 
     class Config:

@@ -15,6 +15,11 @@ services:
       interval: 1s
       retries: 10
 
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
   fastapi:
     build:
       context: .
@@ -35,23 +40,45 @@ services:
     ports:
       - "8000:8000"
 
-  celery_worker:
+  celery_producer:
     build:
       context: ./celery
       dockerfile: Dockerfile
-    command: celery -A tasks worker --loglevel=info --concurrency=1
+    # Concurrency 1 for API rate limiting. Listens to 'api_queue' and default 'celery' (for orchestrator)
+    command: celery -A tasks worker -Q api_queue,celery --loglevel=info --concurrency=1 --hostname=producer@%h
     volumes:
       - ./celery:/app
     env_file:
       - .env
     environment:
-      - CELERY_BROKER_URL=sqla+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - CELERY_BROKER_URL=redis://redis:6379/0
       - FASTAPI_ROUTE=fastapi:8000
       - LICHESS_USERNAME=${LICHESS_USERNAME}
       - LICHESS_TOKEN=${LICHESS_TOKEN}
     depends_on:
       - postgres
       - fastapi
+      - redis
+
+  celery_consumer:
+    build:
+      context: ./celery
+      dockerfile: Dockerfile
+    # Concurrency 8 for parallel DB processing. Listens to 'db_queue'
+    command: celery -A tasks worker -Q db_queue --loglevel=info --concurrency=8 --hostname=consumer@%h
+    volumes:
+      - ./celery:/app
+    env_file:
+      - .env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - FASTAPI_ROUTE=fastapi:8000
+      - LICHESS_USERNAME=${LICHESS_USERNAME}
+      - LICHESS_TOKEN=${LICHESS_TOKEN}
+    depends_on:
+      - postgres
+      - fastapi
+      - redis
 
   celery_beat:
     build:
@@ -63,7 +90,7 @@ services:
     env_file:
       - .env
     environment:
-      - CELERY_BROKER_URL=sqla+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - CELERY_BROKER_URL=redis://redis:6379/0
       - FASTAPI_ROUTE=fastapi:8000
     depends_on:
       - postgres

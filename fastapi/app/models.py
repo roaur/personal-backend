@@ -1,9 +1,32 @@
+"""
+SQLAlchemy Models for the Chess Data Application.
+
+This module defines the database schema using SQLAlchemy ORM.
+It maps Python classes to PostgreSQL tables in the 'chess' schema.
+
+Key Models:
+- Player: Stores player information (ID, name, fetch status).
+- Game: Stores game metadata (ID, PGN, status, time control).
+- GameMove: Stores individual moves for a game (one row per move).
+- GamePlayer: Link table between Games and Players (many-to-many), storing color and rating.
+"""
+
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Text, TIMESTAMP, PrimaryKeyConstraint, Numeric
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
 class Player(Base):
+    """
+    Represents a Chess Player.
+    
+    Attributes:
+        player_id (Text): Unique Lichess username (lowercase). Primary Key.
+        name (String): Display name of the player.
+        flair (String): Optional flair/icon associated with the player.
+        last_fetched_at (TIMESTAMP): When this player's games were last fetched.
+        depth (Integer): Graph traversal depth (0 = main user, 1 = opponent, etc.).
+    """
     __tablename__ = 'players'
     __table_args__ = {'schema': 'chess'}
     
@@ -14,6 +37,24 @@ class Player(Base):
     depth = Column(Integer)
 
 class Game(Base):
+    """
+    Represents a Chess Game.
+    
+    Attributes:
+        game_id (String): Unique Lichess game ID. Primary Key.
+        rated (Boolean): Whether the game was rated.
+        variant (String): Game variant (standard, blitz, etc.).
+        speed (String): Game speed category (bullet, blitz, rapid, classical).
+        perf (String): Performance rating category.
+        created_at (TIMESTAMP): Game start time.
+        last_move_at (TIMESTAMP): Game end time (or last move time).
+        status (String): Game status (mate, resign, draw, etc.).
+        winner (String): 'white', 'black', or None (draw).
+        pgn (Text): Full PGN (Portable Game Notation) string.
+        clock_initial (Integer): Initial clock time in seconds.
+        clock_increment (Integer): Clock increment in seconds.
+        clock_total_time (Integer): Total estimated game time.
+    """
     __tablename__ = 'games'
     __table_args__ = {'schema': 'chess'}
     
@@ -33,6 +74,15 @@ class Game(Base):
     clock_total_time = Column(Integer)
 
 class GameMove(Base):
+    """
+    Represents a single move in a game.
+    
+    Attributes:
+        id (Integer): Auto-incrementing primary key.
+        game_id (String): Foreign Key to games.game_id.
+        move_number (Integer): The move number (1, 2, 3...).
+        move (Text): The move in SAN (Standard Algebraic Notation), e.g., "e4".
+    """
     __tablename__ = 'game_moves'
     __table_args__ = {'schema': 'chess'}
     
@@ -42,6 +92,16 @@ class GameMove(Base):
     move = Column(Text, nullable=False)
 
 class GamePlayer(Base):
+    """
+    Association table linking Games and Players.
+    
+    Attributes:
+        game_id (String): Foreign Key to games.game_id.
+        player_id (Text): Foreign Key to players.player_id.
+        color (Text): 'white' or 'black'.
+        rating (Integer): Player's rating in this game.
+        rating_diff (Integer): Rating change after this game.
+    """
     __tablename__ = 'game_players'
     __table_args__ = (
         PrimaryKeyConstraint('game_id', 'player_id'),
@@ -55,6 +115,9 @@ class GamePlayer(Base):
     rating = Column(Integer)
 
 class Metric(Base):
+    """
+    Represents a metric definition.
+    """
     __tablename__ = 'metric'
     __table_args__ = (
         {'schema': 'chess'}
@@ -65,6 +128,9 @@ class Metric(Base):
     metric_description = Column(Text, unique=True)
 
 class GameMetric(Base):
+    """
+    Stores metric values for a specific game.
+    """
     __tablename__ = 'game_metric'
     __table_args__ = (
         PrimaryKeyConstraint('game_id', 'metric_id'),

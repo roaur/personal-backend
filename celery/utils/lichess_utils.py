@@ -217,10 +217,29 @@ def post_game(game: dict):
     url = f"http://{settings.fastapi_route}/games/"
     post_with_retry(url, game_data)
 
+def post_games_batch(games: list[dict]):
+    if not games:
+        return
+    
+    # Format all games
+    formatted_games = [format_match_core(g) for g in games]
+    
+    logger.debug(f"[post_games_batch] - Posting {len(formatted_games)} games")
+    url = f"http://{settings.fastapi_route}/games/batch"
+    post_with_retry(url, formatted_games)
+
 def post_player(player: dict):
     logger.debug(f"[post_player] - Posting player: {json.dumps(json_serializer(player), indent=2)}")
     url = f"http://{settings.fastapi_route}/players/"
     post_with_retry(url, player)
+
+def post_players_batch(players: list[dict]):
+    if not players:
+        return
+    
+    logger.debug(f"[post_players_batch] - Posting {len(players)} players")
+    url = f"http://{settings.fastapi_route}/players/batch"
+    post_with_retry(url, players)
 
 def post_player_to_match(player: dict, game_id: str, colour: str):
     logger.debug(f"[post_player_to_match] - Posting player to {game_id}: {json.dumps(json_serializer(player), indent=2)}")
@@ -228,6 +247,14 @@ def post_player_to_match(player: dict, game_id: str, colour: str):
     player["game_id"] = game_id # Add game_id because the schema wants it.
     player["color"] = colour
     post_with_retry(url, player)
+
+def post_players_to_matches_batch(links: list[dict]):
+    if not links:
+        return
+
+    logger.debug(f"[post_players_to_matches_batch] - Posting {len(links)} player-match links")
+    url = f"http://{settings.fastapi_route}/games/players/batch"
+    post_with_retry(url, links)
 
 def post_moves_to_match(moves: dict, game_id: str):
     logger.debug(f"[post_moves_to_match] - Posting moves to {game_id}: {json.dumps(json_serializer(moves), indent=2)}")
