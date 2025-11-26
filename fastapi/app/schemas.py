@@ -46,11 +46,15 @@ class PlayerCreate(BaseModel):
     player_id: str
     name: str
     flair: Optional[str] = None
+    last_fetched_at: Optional[datetime] = None
+    depth: Optional[int] = None
 
 class Player(BaseModel):
     player_id: str
     name: str
     flair: Optional[str] = None
+    last_fetched_at: Optional[datetime] = None
+    depth: Optional[int] = None
 
     class Config:
         orm_mode = True

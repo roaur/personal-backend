@@ -1,9 +1,11 @@
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import update
 from sqlalchemy.orm import joinedload
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, or_
 from app import models, schemas
+from datetime import datetime, timedelta, timezone
 from app.data_transformers import flatten_clock_data
 from app.utils import json_serializer
 import sys
@@ -58,10 +60,12 @@ async def get_players_from_game(db: AsyncSession, lichess_id: str):
     return result.scalars().all()
 
 # Create a new player
+# Create a new player
 async def create_player(db: AsyncSession, player: schemas.PlayerCreate):
-    player_data = player.model_dump()
-    statement = insert(models.Player).values(**player_data).on_conflict_do_nothing(
-        index_elements=['player_id']
+    player_data = player.model_dump(exclude_unset=True)
+    statement = insert(models.Player).values(**player_data).on_conflict_do_update(
+        index_elements=['player_id'],
+        set_=player_data
     )
     await db.execute(statement)
     await db.commit()
@@ -70,6 +74,46 @@ async def create_player(db: AsyncSession, player: schemas.PlayerCreate):
         select(models.Player).filter_by(player_id=player_data['player_id'])
     )
     return result.scalar_one()
+
+# Get next player to process
+async def get_next_player_to_process(db: AsyncSession):
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    
+    # Select with SKIP LOCKED to prevent race conditions
+    stmt = select(models.Player).where(
+        (models.Player.depth <= 1) &
+        (
+            (models.Player.last_fetched_at == None) |
+            (models.Player.last_fetched_at < cutoff)
+        )
+    ).order_by(models.Player.last_fetched_at.asc().nullsfirst()).limit(1).with_for_update(skip_locked=True)
+    
+    result = await db.execute(stmt)
+    player = result.scalar_one_or_none()
+
+    if player:
+        # Capture original time for the cursor
+        original_last_fetched_at = player.last_fetched_at
+
+        # Immediately mark as fetched to prevent others from picking it up
+        # (Though the lock itself prevents it during this transaction, 
+        #  the update prevents it after commit)
+        player.last_fetched_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(player)
+        
+        # Restore original time on the object so the worker gets the correct cursor
+        player.last_fetched_at = original_last_fetched_at
+    
+    return player
+
+# Update player last_fetched_at
+async def update_player_fetched_at(db: AsyncSession, player_id: str):
+    stmt = update(models.Player).where(models.Player.player_id == player_id).values(
+        last_fetched_at=datetime.now(timezone.utc)
+    )
+    await db.execute(stmt)
+    await db.commit()
 
 
 # Get a player by Lichess ID

@@ -10,6 +10,8 @@ class Player(Base):
     player_id = Column(Text, unique=True, nullable=False, primary_key=True)
     name = Column(String(255), nullable=False)
     flair = Column(String(255))
+    last_fetched_at = Column(TIMESTAMP(timezone=True))
+    depth = Column(Integer)
 
 class Game(Base):
     __tablename__ = 'games'

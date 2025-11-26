@@ -30,6 +30,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./fastapi:/app
     ports:
       - "8000:8000"
 
@@ -37,18 +39,18 @@ services:
     build:
       context: ./celery
       dockerfile: Dockerfile
-    command: celery -A tasks worker --loglevel=info
+    command: celery -A tasks worker --loglevel=info --concurrency=1
     volumes:
       - ./celery:/app
     env_file:
       - .env
     environment:
-      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_BROKER_URL=sqla+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - FASTAPI_ROUTE=fastapi:8000
       - LICHESS_USERNAME=${LICHESS_USERNAME}
       - LICHESS_TOKEN=${LICHESS_TOKEN}
     depends_on:
-      - rabbitmq
+      - postgres
       - fastapi
 
   celery_beat:
@@ -61,18 +63,11 @@ services:
     env_file:
       - .env
     environment:
-      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_BROKER_URL=sqla+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - FASTAPI_ROUTE=fastapi:8000
     depends_on:
-      - rabbitmq
+      - postgres
       - fastapi
-
-  rabbitmq:
-    image: rabbitmq:management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672" # RabbitMQ broker
-      - "15672:15672" # Management UI (http://localhost:15672)
 
 volumes:
   postgres_data:

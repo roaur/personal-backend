@@ -59,6 +59,20 @@ async def create_player(player: schemas.PlayerCreate, db: AsyncSession = Depends
     db_player = await crud.create_player(db, player)
     return db_player
 
+# Endpoint to get next player to process
+@app.get("/players/process/next", response_model=schemas.Player)
+async def get_next_player_to_process(db: AsyncSession = Depends(get_db)):
+    db_player = await crud.get_next_player_to_process(db)
+    if db_player is None:
+        raise HTTPException(status_code=404, detail="No players to process")
+    return db_player
+
+# Endpoint to update player fetched time
+@app.put("/players/{player_id}/fetched")
+async def update_player_fetched(player_id: str, db: AsyncSession = Depends(get_db)):
+    await crud.update_player_fetched_at(db, player_id)
+    return {"status": "ok"}
+
 # Endpoint to get a player by Lichess ID
 @app.get("/players/{lichess_id}", response_model=schemas.Player)
 async def get_player(lichess_id: str, db: AsyncSession = Depends(get_db)):

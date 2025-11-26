@@ -8,3 +8,6 @@ airflow/dags/__pycache__/
 **/.lichess_token
 .gitconfig
 .bash_history
+celery/celerybeat-schedule
+fastapi/info.log
+celery/celerybeat-schedule
