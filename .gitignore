@@ -10,3 +10,4 @@ airflow/dags/__pycache__/
 .bash_history
 celery/celerybeat-schedule
 fastapi/info.log
+.pytest_cache
