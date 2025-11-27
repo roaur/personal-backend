@@ -1,0 +1,17 @@
+{
+  "packages": {
+    "fastapi": {
+      "release-type": "python",
+      "package-name": "fastapi-service"
+    },
+    "worker": {
+      "release-type": "python",
+      "package-name": "worker-service"
+    },
+    "shared": {
+      "release-type": "python",
+      "package-name": "shared-lib"
+    }
+  },
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
+}
