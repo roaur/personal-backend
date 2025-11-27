@@ -2,7 +2,7 @@ import pytest
 import requests
 import responses
 from unittest.mock import patch
-from utils.lichess_utils import (
+from worker.utils.lichess_utils import (
     RateLimitingAdapter,
     extract_players_from_game,
     format_match_core

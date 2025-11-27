@@ -18,10 +18,13 @@ COPY ./fastapi/alembic.ini /app/alembic.ini
 # Copy the FastAPI app code and migrations into the container
 COPY ./fastapi/app /app/app
 COPY ./fastapi/migrations /app/migrations
+COPY ./shared /app/shared
 COPY .env /app/.env
 
 # Expose FastAPI port
 EXPOSE 8000
+
+ENV PYTHONPATH=/app
 
 # Command to run Alembic migrations and start FastAPI
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug"]

@@ -11,7 +11,7 @@ This document outlines the architecture of the Personal Backend system, designed
     - Acts as the **single source of truth** for data access (reading/writing to Postgres).
     - Enforces idempotency and business logic.
     - Triggers background tasks via Celery.
-- **Tech**: Python, FastAPI, SQLAlchemy, Pydantic.
+- **Tech**: Python 3.12, FastAPI, SQLAlchemy, Pydantic.
 
 ### 2. Celery (`celery/`)
 **Role**: The Muscle (Background Workers).

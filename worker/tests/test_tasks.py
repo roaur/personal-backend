@@ -20,11 +20,11 @@ os.environ['FASTAPI_ROUTE'] = 'localhost:8000'
 # Since 'tasks' imports 'utils.config', we need to mock 'utils.config.settings'
 # THIS MUST HAPPEN BEFORE IMPORTING TASKS
 # sys.modules['utils'] = MagicMock()  <-- REMOVED
-sys.modules['utils.config'] = MagicMock()
-sys.modules['utils.config'].settings = MagicMock()
-sys.modules['utils.config'].settings.lichess_username = 'test_user'
-sys.modules['utils.config'].settings.lichess_token = 'test_token'
-sys.modules['utils.config'].settings.fastapi_route = 'localhost:8000'
+sys.modules['shared.config'] = MagicMock()
+sys.modules['shared.config'].settings = MagicMock()
+sys.modules['shared.config'].settings.lichess_username = 'test_user'
+sys.modules['shared.config'].settings.lichess_token = 'test_token'
+sys.modules['shared.config'].settings.fastapi_route = 'localhost:8000'
 
 # Import tasks - these might fail if not implemented yet, which is expected for TDD
 try:
@@ -134,7 +134,7 @@ def test_orchestrator(mock_get, mock_last_move, mock_fetch):
     4. Triggers fetch_player_games for opponent.
     """
     from tasks import orchestrator as real_orchestrator
-    from utils.config import settings
+    from shared.config import settings
     
     # Setup
     mock_last_move.return_value = 123456

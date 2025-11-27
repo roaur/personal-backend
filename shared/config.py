@@ -7,6 +7,20 @@ class Settings(BaseSettings):
     lichess_username: str = Field(..., validation_alias="LICHESS_USERNAME")
     lichess_token: str = Field(..., validation_alias="LICHESS_TOKEN")
     fastapi_route: str = Field(..., validation_alias="FASTAPI_ROUTE")
+    
+    postgres_user: str = Field(..., validation_alias="POSTGRES_USER")
+    postgres_password: str = Field(..., validation_alias="POSTGRES_PASSWORD")
+    postgres_db: str = Field(..., validation_alias="POSTGRES_DB")
+    postgres_host: str = Field("localhost", validation_alias="POSTGRES_HOST")
+    postgres_port: str = Field("5432", validation_alias="POSTGRES_PORT")
+
+    @property
+    def database_url(self) -> str:
+        return f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+
+    @property
+    def async_database_url(self) -> str:
+        return f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     class Config:
         env_file = ".env"  # Optional: load other environment variables from a .env file

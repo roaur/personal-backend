@@ -17,7 +17,8 @@ from sqlalchemy.future import select
 from sqlalchemy import update
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import func, or_
-from app import models, schemas
+from shared import models
+from app import schemas
 from datetime import datetime, timedelta, timezone
 from app.data_transformers import flatten_clock_data
 from app.utils import json_serializer

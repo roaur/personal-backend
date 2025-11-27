@@ -47,14 +47,11 @@ services:
       context: .
       dockerfile: fastapi/Dockerfile
     restart: always
+    env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: pgbouncer
       POSTGRES_PORT: 6432
       SQLALCHEMY_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
     depends_on:
       pgbouncer:
         condition: service_started
@@ -62,76 +59,84 @@ services:
         condition: service_healthy
     volumes:
       - ./fastapi:/app
+      - ./shared:/app/shared
     ports:
       - "8000:8000"
 
   celery_producer:
     build:
-      context: ./celery
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: worker/Dockerfile
     restart: always
     # Concurrency 1 for Rate Limiting
-    command: celery -A tasks worker -Q api_queue,celery --loglevel=info --concurrency=1 --hostname=producer@%h
+    command: celery -A worker.tasks worker -Q api_queue,celery --loglevel=info --concurrency=1 --hostname=producer@%h
+    env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      PYTHONPATH: /app
       POSTGRES_HOST: pgbouncer
       POSTGRES_PORT: 6432
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      LICHESS_TOKEN: ${LICHESS_TOKEN}
-      LICHESS_USERNAME: ${LICHESS_USERNAME}
-      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
     depends_on:
       - redis
       - pgbouncer
     volumes:
-      - ./celery:/app
+      - ./worker:/app/worker
+      - ./shared:/app/shared
 
   celery_consumer:
     build:
-      context: ./celery
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: worker/Dockerfile
     restart: always
     # Concurrency 8 for Parallel Processing
-    command: celery -A tasks worker -Q db_queue --loglevel=info --concurrency=8 --hostname=consumer@%h
+    command: celery -A worker.tasks worker -Q db_queue --loglevel=info --concurrency=8 --hostname=consumer@%h
+    env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      PYTHONPATH: /app
       POSTGRES_HOST: pgbouncer
       POSTGRES_PORT: 6432
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      LICHESS_TOKEN: ${LICHESS_TOKEN}
-      LICHESS_USERNAME: ${LICHESS_USERNAME}
-      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
     depends_on:
       - redis
       - pgbouncer
     volumes:
-      - ./celery:/app
+      - ./worker:/app/worker
+      - ./shared:/app/shared
+
+  celery_analysis:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    restart: always
+    # Concurrency 1 for Analysis (DuckDB is single-threaded per connection usually, and we want to avoid contention)
+    command: celery -A worker.tasks worker -Q analysis_queue --loglevel=info --concurrency=1 --hostname=analysis@%h
+    env_file: .env
+    environment:
+      PYTHONPATH: /app
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+    depends_on:
+      - redis
+      - pgbouncer
+    volumes:
+      - ./worker:/app/worker
+      - ./shared:/app/shared
 
   celery_beat:
     build:
-      context: ./celery
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: worker/Dockerfile
     restart: always
-    command: celery -A tasks beat --loglevel=info
+    command: celery -A worker.tasks beat --loglevel=info
+    env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      PYTHONPATH: /app
       POSTGRES_HOST: pgbouncer
       POSTGRES_PORT: 6432
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      LICHESS_TOKEN: ${LICHESS_TOKEN}
-      LICHESS_USERNAME: ${LICHESS_USERNAME}
-      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
     depends_on:
       - redis
       - pgbouncer
     volumes:
-      - ./celery:/app
+      - ./worker:/app/worker
+      - ./shared:/app/shared
 
 volumes:
   postgres_data:

@@ -17,7 +17,7 @@ This project implements a **Producer-Consumer** architecture to efficiently fetc
 
 ## 🛠️ Tech Stack
 
-- **Language**: Python 3.11+
+- **Language**: Python 3.12+ (Managed via `pyenv`)
 - **API Framework**: FastAPI
 - **Task Queue**: Celery
 - **Broker**: Redis
@@ -92,15 +92,24 @@ docker-compose logs -f celery_producer celery_consumer
 ## 🧪 Development
 
 ### Local Setup (Python)
-We use `pyenv` and `virtualenv` for local development.
+We use `pyenv` and `pyenv-virtualenv` for local development to ensure a consistent Python 3.12 environment.
 
 ```bash
-# Install dependencies
-cd celery
+# 1. Install Python 3.12 with pyenv
+pyenv install 3.12.12
+
+# 2. Create virtual environment for analysis
+pyenv virtualenv 3.12.12 analysis-env
+
+# 3. Activate it in the analysis directory
+cd analysis
+pyenv local analysis-env
+
+# 4. Install dependencies
 pip install -r requirements.txt
 
-# Run Tests
-pytest tests/test_tasks.py
+# 5. Run Tests
+pytest tests/
 ```
 
 ### Database Migrations

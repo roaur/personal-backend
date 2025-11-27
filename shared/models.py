@@ -140,3 +140,19 @@ class GameMetric(Base):
     game_id = Column(Text, ForeignKey('chess.games.game_id', ondelete='CASCADE'), nullable=False)
     metric_id = Column(Text, ForeignKey('chess.metric.metric_id', ondelete='CASCADE'), nullable=False)
     metric_value = Column(Numeric)
+
+class GameFeature(Base):
+    """
+    Entity-Attribute-Value (EAV) table for storing flexible game analysis features.
+    Populated by the Analysis Engine plugins.
+    """
+    __tablename__ = 'game_features'
+    __table_args__ = (
+        PrimaryKeyConstraint('game_id', 'feature_name'),
+        {'schema': 'chess'}
+    )
+
+    game_id = Column(Text, ForeignKey('chess.games.game_id', ondelete='CASCADE'), nullable=False)
+    feature_name = Column(Text, nullable=False)
+    feature_value = Column(Text, nullable=False) # Stores string representation of value
+    feature_type = Column(Text, nullable=False)  # 'categorical', 'numerical', 'boolean'
