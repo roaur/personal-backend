@@ -172,9 +172,10 @@ def fetch_player_games(self, username: str, since: int, depth: int):
         # We re-queue the task with the new 'since' cursor.
         if count >= params["max"]:
             if last_game_time:
-                logging.info(f"Pagination: Re-queuing fetch for {username} starting from {last_game_time}")
+                next_since = last_game_time + 1
+                logging.info(f"Pagination: Re-queuing fetch for {username} starting from {next_since}")
                 # Dispatch new task to the back of the queue
-                fetch_player_games.delay(username, since=last_game_time, depth=depth)
+                fetch_player_games.delay(username, since=next_since, depth=depth)
             else:
                 logging.warning("Pagination: Could not determine last game time. Stopping.")
         
