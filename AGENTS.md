@@ -25,6 +25,9 @@ This document outlines the architecture of the Personal Backend system, designed
         - **Streaming**: Streams NDJSON responses and dispatches individual game tasks immediately.
         - **Pagination**: Automatically loops to fetch *all* games for a player (handling >1000 games).
         - **Resumable**: Uses `last_move_time` from the DB to resume fetching exactly where it left off.
+        - **Error Handling**: 
+            - **404s**: Gracefully handles "User Not Found" by logging a warning and stopping, preventing infinite retry loops.
+            - **New Players**: Automatically detects new players and fetches their *entire* history (starting from time 0) instead of just recent games.
     - **`celery_consumer`**:
         - **Queue**: `db_queue` (Concurrency: Scalable, e.g., 8).
         - **Job**: Processes raw game data and writes to Postgres via FastAPI.

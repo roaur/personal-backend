@@ -99,9 +99,17 @@ We use `pyenv` and `virtualenv` for local development.
 cd celery
 pip install -r requirements.txt
 
-# Run Tests
-pytest tests/test_tasks.py
+# Run Tests (Dockerized)
+make test
+
+# Run Tests (Local Python Environment)
+pytest celery/tests/
 ```
+
+### CI/CD
+- **GitHub Actions**: Tests are automatically run on every Pull Request to `master`.
+- **Release Please**: Automates versioning and changelogs based on Conventional Commits.
+- **Pre-commit**: Enforces commit message standards locally.
 
 ### Database Migrations
 Migrations are handled by **Alembic** (within FastAPI).
