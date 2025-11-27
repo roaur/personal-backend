@@ -1,7 +1,20 @@
 import pytest
 import requests
 import responses
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+import sys
+import os
+
+# Add the parent directory to sys.path so we can import utils
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Mock settings to avoid validation errors during import
+# This must happen BEFORE importing utils.lichess_utils
+sys.modules['utils.config'] = MagicMock()
+sys.modules['utils.config'].settings = MagicMock()
+sys.modules['utils.config'].settings.lichess_token = 'test_token'
+sys.modules['utils.config'].settings.fastapi_route = 'localhost:8000'
+
 from utils.lichess_utils import (
     RateLimitingAdapter,
     extract_players_from_game,
