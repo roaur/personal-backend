@@ -218,7 +218,12 @@ async def get_next_player_to_process(db: AsyncSession):
         await db.refresh(player)
         
         # Get the last move time for this player
-        last_move_time = await get_last_move_time_for_player(db, player.player_id)
+        # If the player has never been fetched before (original_last_fetched_at is None),
+        # we want to fetch ALL games, so we set last_move_time to 0.
+        if original_last_fetched_at is None:
+            last_move_time = 0
+        else:
+            last_move_time = await get_last_move_time_for_player(db, player.player_id)
         
         # Return player data + last_move_time
         # We construct a dictionary that matches the PlayerProcessResponse schema
