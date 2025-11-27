@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/roaur/personal-backend/compare/fastapi-service-v0.2.0...fastapi-service-v0.2.1) (2025-11-27)
+
+
+### Bug Fixes
+
+* do not accidentially skip new opponent matches ([2cd484b](https://github.com/roaur/personal-backend/commit/2cd484b1c140edb81d7839303a92b01abf0f9303))
+
 ## [0.2.0](https://github.com/roaur/personal-backend/compare/fastapi-service-v0.1.0...fastapi-service-v0.2.0) (2025-11-27)
 
 
