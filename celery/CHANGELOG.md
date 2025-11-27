@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/roaur/personal-backend/compare/celery-service-v0.2.0...celery-service-v0.2.1) (2025-11-27)
+
+
+### Bug Fixes
+
+* do not continuously retry if player fetch is 404 ([63b6d04](https://github.com/roaur/personal-backend/commit/63b6d04d73322d67d5d2e026e2a395b17e25b715))
+
 ## [0.2.0](https://github.com/roaur/personal-backend/compare/celery-service-v0.1.0...celery-service-v0.2.0) (2025-11-27)
 
 
