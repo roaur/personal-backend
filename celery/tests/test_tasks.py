@@ -5,6 +5,7 @@ import os
 import sys
 from unittest.mock import MagicMock, patch, call, ANY
 import pytest
+import requests
 
 # Add the parent directory to sys.path so we can import tasks
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -80,6 +81,36 @@ def test_fetch_player_games(mock_get, mock_delay, mock_redis):
         call({'id': 'game1', 'players': {}}, 0),
         call({'id': 'game2', 'players': {}}, 0)
     ])
+
+@patch('tasks.redis_client')
+@patch('tasks.requests.get')
+def test_fetch_player_games_404(mock_get, mock_redis):
+    """
+    Test that fetch_player_games stops on 404 and does NOT retry.
+    """
+    # Mock Redis Lock
+    mock_lock = MagicMock()
+    mock_lock.acquire.return_value = True
+    mock_redis.lock.return_value = mock_lock
+
+    # Mock 404 response
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Client Error", response=mock_response)
+    
+    # Context manager support
+    mock_get.return_value.__enter__.return_value = mock_response
+    mock_get.return_value.__exit__.return_value = None
+
+    # We need to mock self.retry to assert it's NOT called
+    with patch('tasks.fetch_player_games.retry') as mock_retry:
+        fetch_player_games("unknown_user", since=0, depth=0)
+        
+        # Verify retry was NOT called
+        mock_retry.assert_not_called()
+
+    # Verify lock was released
+    mock_lock.release.assert_called_once()
 
 @patch('tasks.requests.post')
 def test_process_game_data(mock_post):

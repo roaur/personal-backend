@@ -1,5 +1,6 @@
 import logging
 import requests
+from requests.exceptions import HTTPError
 import berserk
 from celery import Celery
 import os
@@ -179,6 +180,12 @@ def fetch_player_games(self, username: str, since: int, depth: int):
             else:
                 logging.warning("Pagination: Could not determine last game time. Stopping.")
         
+    except HTTPError as e:
+        if e.response.status_code == 404:
+            logging.warning(f"User {username} not found (404). Stopping task.")
+            return
+        logging.error(f"HTTP error fetching games for {username}: {e}")
+        self.retry(exc=e, countdown=10, max_retries=5)
     except Exception as e:
         logging.error(f"Error fetching games for {username}: {e}")
         self.retry(exc=e, countdown=10, max_retries=5)
