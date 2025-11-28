@@ -347,6 +347,11 @@ async def upsert_game_metrics(db: AsyncSession, game_id: str, metrics: dict):
     result = await db.execute(select(models.GameMetrics).where(models.GameMetrics.game_id == game_id))
     return result.scalar_one()
 
+async def get_game_metrics(db: AsyncSession, game_id: str):
+    """Retrieves metrics for a game."""
+    result = await db.execute(select(models.GameMetrics).where(models.GameMetrics.game_id == game_id))
+    return result.scalar_one_or_none()
+
 async def get_games_needing_analysis(db: AsyncSession, plugin_names: list[str], limit: int = 100):
     """
     Finds games that are missing analysis for ANY of the provided plugins.
@@ -373,7 +378,7 @@ async def get_games_needing_analysis(db: AsyncSession, plugin_names: list[str], 
             models.GameMetrics.game_id == None, # No metrics row at all
             or_(*conditions) # Row exists but missing a key
         )
-    ).limit(limit)
+    ).order_by(models.Game.created_at.desc()).limit(limit)
     
     result = await db.execute(stmt)
     return result.scalars().all()

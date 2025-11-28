@@ -23,6 +23,8 @@ import coloredlogs
 # =============================================================================
 # Logging Setup
 # =============================================================================
+from typing import Optional
+
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='INFO', logger=logger)
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(funcName)s %(message)s")
@@ -201,8 +203,20 @@ async def upsert_game_metrics(game_id: str, metrics: dict = Body(...), db: Async
     db_metrics = await crud.upsert_game_metrics(db, game_id, metrics)
     return db_metrics
 
+@app.get("/games/{game_id}/metrics", response_model=Optional[schemas.GameMetrics])
+async def get_game_metrics(game_id: str, db: AsyncSession = Depends(get_db)):
+    """Retrieves analysis metrics for a game."""
+    db_metrics = await crud.get_game_metrics(db, game_id)
+    if db_metrics is None:
+        return None
+    return db_metrics
+
 @app.post("/games/analysis/queue", response_model=list[str])
-async def get_games_needing_analysis(plugins: list[str] = Body(...), limit: int = 100, db: AsyncSession = Depends(get_db)):
+async def get_games_needing_analysis(
+    plugins: list[str] = Body(...), 
+    limit: int = 100, 
+    db: AsyncSession = Depends(get_db)
+):
     """
     Returns a list of game IDs that need analysis for the specified plugins.
     """
