@@ -23,6 +23,7 @@ from app.data_transformers import flatten_clock_data
 from app.utils import json_serializer
 import sys
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 # logger.setLevel(logging.DEBUG)

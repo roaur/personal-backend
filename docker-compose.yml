@@ -111,6 +111,52 @@ services:
     volumes:
       - ./celery:/app
 
+  analysis_producer:
+    build:
+      context: ./celery
+      dockerfile: Dockerfile
+    restart: always
+    # Concurrency 1 is enough for scheduling
+    command: celery -A tasks worker -Q analysis_scheduling_queue --loglevel=info --concurrency=1 --hostname=analysis_producer@%h
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      LICHESS_TOKEN: ${LICHESS_TOKEN}
+      LICHESS_USERNAME: ${LICHESS_USERNAME}
+      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
+    depends_on:
+      - redis
+      - pgbouncer
+    volumes:
+      - ./celery:/app
+
+  analysis_consumer:
+    build:
+      context: ./celery
+      dockerfile: Dockerfile
+    restart: always
+    # Concurrency 4 for analysis (CPU intensive)
+    command: celery -A tasks worker -Q analysis_queue --loglevel=info --concurrency=4 --hostname=analysis_consumer@%h
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 6432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      LICHESS_TOKEN: ${LICHESS_TOKEN}
+      LICHESS_USERNAME: ${LICHESS_USERNAME}
+      FASTAPI_ROUTE: ${FASTAPI_ROUTE}
+    depends_on:
+      - redis
+      - pgbouncer
+    volumes:
+      - ./celery:/app
+
   celery_beat:
     build:
       context: ./celery

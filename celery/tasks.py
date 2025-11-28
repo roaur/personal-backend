@@ -363,7 +363,7 @@ def analyze_game(game_id: str):
         # Retry logic?
         # self.retry(exc=e, countdown=60, max_retries=3)
 
-@app.task
+@app.task(queue='analysis_scheduling_queue')
 def enqueue_analysis_tasks():
     """
     Periodic task to find games needing analysis and enqueue them.
