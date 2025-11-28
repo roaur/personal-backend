@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/roaur/personal-backend/compare/celery-service-v0.3.0...celery-service-v0.3.1) (2025-11-28)
+
+
+### Bug Fixes
+
+* **celery:** deduplicate analysis ([9f9f194](https://github.com/roaur/personal-backend/commit/9f9f194c4d662c1fa212289827890dfefc9e132d))
+* **celery:** test deduplication ([3ece513](https://github.com/roaur/personal-backend/commit/3ece5138053f9ba6af3f5b9e2a17cc10b1f027e3))
+
 ## [0.3.0](https://github.com/roaur/personal-backend/compare/celery-service-v0.2.1...celery-service-v0.3.0) (2025-11-28)
 
 
