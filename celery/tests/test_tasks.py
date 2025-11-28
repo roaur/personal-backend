@@ -198,54 +198,127 @@ def test_orchestrator(mock_get, mock_last_move, mock_fetch):
     assert args[0] == 'opponent1'
     assert kwargs['depth'] == 1
 
-@patch('tasks.requests')
-@patch('tasks.chess.engine.SimpleEngine')
+@patch('tasks.redis_client')
+@patch('tasks.requests.get')
+@patch('tasks.requests.post')
 @patch('tasks.chess.pgn.read_game')
-def test_analyze_game(mock_read_game, mock_engine_cls, mock_requests):
-    # Mock API responses
-    mock_requests.get.return_value.json.return_value = {"pgn": "1. e4"}
-    mock_requests.get.return_value.status_code = 200
+@patch('tasks.chess.engine.SimpleEngine.popen_uci')
+def test_analyze_game(mock_engine_cls, mock_read_game, mock_post, mock_get, mock_redis):
+    # Mock GET metrics response (Double-check)
+    # First call is to check metrics (return 404 or empty to proceed)
+    # Second call is to fetch PGN
+    mock_get_metrics_response = MagicMock()
+    mock_get_metrics_response.status_code = 404 # No metrics yet
     
-    # Mock Game object
+    mock_get_pgn_response = MagicMock()
+    mock_get_pgn_response.status_code = 200
+    mock_get_pgn_response.json.return_value = {"pgn": "1. e4 e5"}
+    
+    mock_get.side_effect = [mock_get_metrics_response, mock_get_pgn_response]
+    
+    # Mock PGN parsing
     mock_game = MagicMock()
     mock_read_game.return_value = mock_game
     
     # Mock Engine
     mock_engine = MagicMock()
-    mock_engine_cls.popen_uci.return_value = mock_engine
+    mock_engine_cls.return_value = mock_engine
     
-    # Mock Plugin analysis
-    with patch('tasks.PLUGINS') as mock_plugins:
-        mock_plugin = MagicMock()
+    # Mock Plugin Analysis
+    # We need to patch PLUGINS or the plugin instance
+    with patch('tasks.PLUGINS', [MagicMock()]) as mock_plugins:
+        mock_plugin = mock_plugins[0]
         mock_plugin.name = "test_plugin"
         mock_plugin.analyze.return_value = {"score": 100}
-        mock_plugins.__iter__.return_value = [mock_plugin]
         
-        # Run task
-        # We need to import analyze_game from tasks inside the function if it wasn't imported at top level correctly
-        # But we updated the import block above.
-        from tasks import analyze_game
+        # Mock Save Results
+        mock_post_response = MagicMock()
+        mock_post_response.status_code = 200
+        mock_post.return_value = mock_post_response
         
-        analyze_game("game_123")
+        analyze_game("game1")
         
-        # Verify API calls
-        # settings.fastapi_route is mocked to 'localhost:8000'
-        mock_requests.get.assert_called_with("http://localhost:8000/games/game_123/pgn")
+        # Verify interactions
+        # Should call GET metrics, then GET PGN
+        assert mock_get.call_count == 2
+        mock_get.assert_any_call("http://localhost:8000/games/game1/metrics")
+        mock_get.assert_any_call("http://localhost:8000/games/game1/pgn")
         
-        mock_requests.post.assert_called()
-        args, kwargs = mock_requests.post.call_args
-        assert kwargs['json'] == {"test_plugin": {"score": 100}}
+        mock_plugin.analyze.assert_called_once()
+        mock_post.assert_called_with(
+            "http://localhost:8000/games/game1/metrics",
+            json={"test_plugin": {"score": 100}}
+        )
+        
+        # Verify Redis cleanup
+        mock_redis.delete.assert_called_once_with("analysis_pending:game1")
 
-@patch('tasks.requests')
-def test_enqueue_analysis_tasks(mock_requests):
-    # Mock API response
-    mock_requests.post.return_value.json.return_value = ["game_1", "game_2"]
-    mock_requests.post.return_value.status_code = 200
+@patch('tasks.redis_client')
+@patch('tasks.requests.get')
+@patch('tasks.chess.pgn.read_game')
+@patch('tasks.chess.engine.SimpleEngine.popen_uci')
+def test_analyze_game_skips_if_metrics_exist(mock_engine_cls, mock_read_game, mock_get, mock_redis):
+    # Mock GET metrics response (Metrics exist)
+    mock_get_metrics_response = MagicMock()
+    mock_get_metrics_response.status_code = 200
+    mock_get_metrics_response.json.return_value = {"metrics": {"test_plugin": {"score": 100}}}
     
-    with patch('tasks.analyze_game.delay') as mock_delay:
-        from tasks import enqueue_analysis_tasks
-        enqueue_analysis_tasks()
+    # Mock GET PGN response (Still fetched)
+    mock_get_pgn_response = MagicMock()
+    mock_get_pgn_response.status_code = 200
+    mock_get_pgn_response.json.return_value = {"pgn": "1. e4 e5"}
+    
+    mock_get.side_effect = [mock_get_metrics_response, mock_get_pgn_response]
+    
+    # Mock PGN parsing
+    mock_game = MagicMock()
+    mock_read_game.return_value = mock_game
+    
+    # Mock Engine
+    mock_engine = MagicMock()
+    mock_engine_cls.return_value = mock_engine
+    
+    with patch('tasks.PLUGINS', [MagicMock()]) as mock_plugins:
+        mock_plugin = mock_plugins[0]
+        mock_plugin.name = "test_plugin"
         
-        assert mock_delay.call_count == 2
-        mock_delay.assert_any_call("game_1")
-        mock_delay.assert_any_call("game_2")
+        analyze_game("game1")
+        
+        # Verify interactions
+        # Should call GET metrics AND GET PGN
+        assert mock_get.call_count == 2
+        mock_get.assert_any_call("http://localhost:8000/games/game1/metrics")
+        mock_get.assert_any_call("http://localhost:8000/games/game1/pgn")
+        
+        # Should NOT run analysis for this plugin
+        mock_plugin.analyze.assert_not_called()
+        
+        # Should clear Redis key
+        mock_redis.delete.assert_called_once_with("analysis_pending:game1")
+
+@patch('tasks.redis_client')
+@patch('tasks.requests.post')
+@patch('tasks.analyze_game.delay')
+def test_enqueue_analysis_tasks(mock_delay, mock_post, mock_redis):
+    # Mock API response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = ["game1", "game2"]
+    mock_post.return_value = mock_response
+    
+    # Mock Redis: game1 is new, game2 is already pending
+    mock_redis.exists.side_effect = lambda k: k == "analysis_pending:game2"
+    
+    enqueue_analysis_tasks()
+    
+    # Verify API call
+    # Should request 1000 candidates
+    args, kwargs = mock_post.call_args
+    assert kwargs['params'] == {'limit': 1000}
+    
+    # Verify tasks enqueued
+    # Should only enqueue game1
+    mock_delay.assert_called_once_with("game1")
+    
+    # Verify Redis set for game1 with 1 hour TTL
+    mock_redis.set.assert_called_once_with("analysis_pending:game1", "1", ex=3600)
