@@ -182,3 +182,29 @@ async def get_players_from_game(game_id: str, db: AsyncSession = Depends(get_db)
     """Retrieves all players for a given game."""
     db_game_players = await crud.get_players_from_game(db, game_id)
     return db_game_players
+
+# =============================================================================
+# Analysis Endpoints
+# =============================================================================
+
+@app.get("/games/{game_id}/pgn", response_model=dict)
+async def get_game_pgn(game_id: str, db: AsyncSession = Depends(get_db)):
+    """Retrieves the PGN for a game."""
+    pgn = await crud.get_game_pgn(db, game_id)
+    if pgn is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return {"pgn": pgn}
+
+@app.post("/games/{game_id}/metrics", response_model=schemas.GameMetrics)
+async def upsert_game_metrics(game_id: str, metrics: dict = Body(...), db: AsyncSession = Depends(get_db)):
+    """Upserts analysis metrics for a game."""
+    db_metrics = await crud.upsert_game_metrics(db, game_id, metrics)
+    return db_metrics
+
+@app.post("/games/analysis/queue", response_model=list[str])
+async def get_games_needing_analysis(plugins: list[str] = Body(...), limit: int = 100, db: AsyncSession = Depends(get_db)):
+    """
+    Returns a list of game IDs that need analysis for the specified plugins.
+    """
+    game_ids = await crud.get_games_needing_analysis(db, plugins, limit)
+    return game_ids

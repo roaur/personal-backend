@@ -154,3 +154,21 @@ class PlayerProcessResponse(Player):
 
     class Config:
         orm_mode = True
+
+# =============================================================================
+# Analysis Schemas
+# =============================================================================
+
+class GameMetricsCreate(BaseModel):
+    """Schema for creating/updating game metrics."""
+    game_id: str
+    metrics: dict
+
+class GameMetrics(BaseModel):
+    """Schema for reading game metrics."""
+    id: int
+    game_id: str
+    metrics: dict
+
+    class Config:
+        orm_mode = True

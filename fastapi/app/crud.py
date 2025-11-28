@@ -311,3 +311,68 @@ async def get_last_move_time(db: AsyncSession) -> int:
     if last_move_time:
         return {"last_move_time": int(last_move_time.timestamp() * 1000)}  # Wrap in a dictionary
     return {"last_move_time": 0}  # Return 0 wrapped in a dictionary
+
+# =============================================================================
+# Analysis Operations
+# =============================================================================
+
+async def get_game_pgn(db: AsyncSession, game_id: str) -> Optional[str]:
+    """Fetches the PGN for a specific game."""
+    result = await db.execute(select(models.Game.pgn).where(models.Game.game_id == game_id))
+    return result.scalar_one_or_none()
+
+async def upsert_game_metrics(db: AsyncSession, game_id: str, metrics: dict):
+    """
+    Upserts game metrics.
+    Merges the new metrics into the existing JSONB column.
+    """
+    # First, check if the record exists to get current metrics (needed for merge if not using jsonb_concat which might be tricky with sqlalchemy)
+    # Actually, PostgreSQL has || operator for jsonb.
+    # stmt = insert(models.GameMetrics).values(game_id=game_id, metrics=metrics)
+    # stmt = stmt.on_conflict_do_update(
+    #     index_elements=['game_id'],
+    #     set_={'metrics': models.GameMetrics.metrics + metrics} # This uses || operator
+    # )
+    # But let's be safe and simple.
+    
+    stmt = insert(models.GameMetrics).values(game_id=game_id, metrics=metrics)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=['game_id'],
+        set_={'metrics': models.GameMetrics.metrics.concat(metrics)}
+    )
+    await db.execute(stmt)
+    await db.commit()
+    
+    result = await db.execute(select(models.GameMetrics).where(models.GameMetrics.game_id == game_id))
+    return result.scalar_one()
+
+async def get_games_needing_analysis(db: AsyncSession, plugin_names: list[str], limit: int = 100):
+    """
+    Finds games that are missing analysis for ANY of the provided plugins.
+    """
+    # We want games where:
+    # 1. No entry in game_metrics OR
+    # 2. Entry exists but metrics JSON is missing one of the keys.
+    
+    # Construct the WHERE clause
+    # models.GameMetrics.metrics.has_key(name) check?
+    # We want NOT has_key.
+    
+    conditions = []
+    for name in plugin_names:
+        conditions.append(~models.GameMetrics.metrics.has_key(name))
+    
+    # Combined condition: (metrics is NULL) OR (metrics missing key1) OR (metrics missing key2)...
+    # Since we are joining, if no row exists, metrics is NULL (if we left join).
+    
+    stmt = select(models.Game.game_id).outerjoin(
+        models.GameMetrics, models.Game.game_id == models.GameMetrics.game_id
+    ).where(
+        or_(
+            models.GameMetrics.game_id == None, # No metrics row at all
+            or_(*conditions) # Row exists but missing a key
+        )
+    ).limit(limit)
+    
+    result = await db.execute(stmt)
+    return result.scalars().all()

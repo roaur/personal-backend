@@ -11,7 +11,8 @@ Key Models:
 - GamePlayer: Link table between Games and Players (many-to-many), storing color and rating.
 """
 
-from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Text, TIMESTAMP, PrimaryKeyConstraint, Numeric
+from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Text, TIMESTAMP, PrimaryKeyConstraint, Numeric, Index
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -114,29 +115,16 @@ class GamePlayer(Base):
     rating_diff = Column(Integer)
     rating = Column(Integer)
 
-class Metric(Base):
+class GameMetrics(Base):
     """
-    Represents a metric definition.
+    Stores metric values for a specific game in a JSONB column.
     """
-    __tablename__ = 'metric'
+    __tablename__ = 'game_metrics'
     __table_args__ = (
+        Index('ix_game_metrics_metrics', 'metrics', postgresql_using='gin'),
         {'schema': 'chess'}
     )
 
-    metric_id = Column(Integer, primary_key=True)
-    metric_name = Column(Text, unique=True, nullable=False)
-    metric_description = Column(Text, unique=True)
-
-class GameMetric(Base):
-    """
-    Stores metric values for a specific game.
-    """
-    __tablename__ = 'game_metric'
-    __table_args__ = (
-        PrimaryKeyConstraint('game_id', 'metric_id'),
-        {'schema': 'chess'}
-    )
-
-    game_id = Column(Text, ForeignKey('chess.games.game_id', ondelete='CASCADE'), nullable=False)
-    metric_id = Column(Text, ForeignKey('chess.metric.metric_id', ondelete='CASCADE'), nullable=False)
-    metric_value = Column(Numeric)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Text, ForeignKey('chess.games.game_id', ondelete='CASCADE'), unique=True, nullable=False)
+    metrics = Column(JSONB, nullable=False, default={})
