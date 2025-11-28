@@ -27,5 +27,4 @@ jobs:
           cache-to: type=gha,mode=max
           
       - name: Run Tests
-        run: |
-          docker run --rm celery-test:latest pytest tests/
+        run: make test
