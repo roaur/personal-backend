@@ -14,12 +14,17 @@ class LargestSwingPlugin(AnalysisPlugin):
         swing_move = 0
         best_move_san = None
         best_move_uci = None
+        best_mate_in = None
         
-        # Initial position score (usually 0.3 or similar, but let's start tracking from move 1)
-        # Or we can analyze the initial position too.
-        # Let's analyze initial position.
+        # Initial position score
         info = engine.analyse(board, chess.engine.Limit(time=0.1))
-        prev_score = info["score"].white().score(mate_score=10000)
+        score_obj = info["score"].white()
+        
+        if score_obj.is_mate():
+            raw_score = score_obj.score(mate_score=10000)
+            prev_score = 10.0 if raw_score > 0 else -10.0
+        else:
+            prev_score = max(-10.0, min(10.0, score_obj.score() / 100.0))
         
         # Iterate through all moves
         node = game
@@ -33,35 +38,45 @@ class LargestSwingPlugin(AnalysisPlugin):
             
             # Analyze position
             info = engine.analyse(board, chess.engine.Limit(time=0.5))
-            score = info["score"].white().score(mate_score=10000)
+            
+            # Get score object
+            score_obj = info["score"].white()
+            
+            # Normalize score
+            current_mate_in = None
+            if score_obj.is_mate():
+                mate_moves = score_obj.mate()
+                current_mate_in = mate_moves
+                
+                # Determine sign of mate using a large mate_score
+                raw_score = score_obj.score(mate_score=10000)
+                if raw_score > 0:
+                    score_val = 10.0
+                else:
+                    score_val = -10.0
+            else:
+                # Centipawns to pawns
+                score_val = score_obj.score() / 100.0
+                score_val = max(-10.0, min(10.0, score_val))
             
             # Calculate swing (absolute difference)
-            # We care about the magnitude of the change in evaluation.
-            swing = abs(score - prev_score)
-            
-            # Convert centipawns to pawns for easier reading? 
-            # Or keep in centipawns. Let's keep in centipawns (integer usually, but score() returns int).
-            # Wait, score() returns int.
+            swing = abs(score_val - prev_score)
             
             if swing > largest_swing:
                 largest_swing = swing
                 swing_move = move_number
                 # Capture move details
-                # We need the SAN of the move *before* pushing it, or use board.san(move) *before* pushing.
-                # But we already pushed it. 
-                # Actually, board.push(move) was called above.
-                # We can get SAN from the node? next_node.san() might work if read from PGN.
-                # Or generate it from the board state *before* the push.
-                # Let's use next_node.san() which is reliable for PGNs.
                 best_move_san = next_node.san()
                 best_move_uci = move.uci()
+                best_mate_in = current_mate_in
             
-            prev_score = score
+            prev_score = score_val
             node = next_node
             
         return {
-            "swing_eval": largest_swing,
+            "swing_eval": round(largest_swing, 2), # Round to 2 decimal places
             "ply": swing_move,
             "move_san": best_move_san if largest_swing > 0 else None,
-            "move_uci": best_move_uci if largest_swing > 0 else None
+            "move_uci": best_move_uci if largest_swing > 0 else None,
+            "forced_mate_in": best_mate_in
         }
