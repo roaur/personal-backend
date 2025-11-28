@@ -140,7 +140,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     # Concurrency 4 for analysis (CPU intensive)
-    command: celery -A tasks worker -Q analysis_queue --loglevel=info --concurrency=4 --hostname=analysis_consumer@%h
+    command: celery -A tasks worker -Q analysis_queue --loglevel=info --concurrency=2 --hostname=analysis_consumer@%h
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
