@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/roaur/personal-backend/compare/celery-service-v0.2.1...celery-service-v0.3.0) (2025-11-28)
+
+
+### Features
+
+* add analysis workers to compose ([b612593](https://github.com/roaur/personal-backend/commit/b612593a833b397e0425c79ca29331f72a5c26a8))
+* **celery:** implement background chess analysis engine ([b523b10](https://github.com/roaur/personal-backend/commit/b523b109cad843ad4f78d2c8086e6a30366228fb))
+
+
+### Bug Fixes
+
+* **celery:** handle forced mates and update from centipawns to eval ([24d056e](https://github.com/roaur/personal-backend/commit/24d056edc268ea401d06e9737ab6fd9361045263))
+* fix path for stockfish in consumer ([7079d29](https://github.com/roaur/personal-backend/commit/7079d29fb5f081643f30536c33a4fd0f82f1398d))
+
 ## [0.2.1](https://github.com/roaur/personal-backend/compare/celery-service-v0.2.0...celery-service-v0.2.1) (2025-11-27)
 
 

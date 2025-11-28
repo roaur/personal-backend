@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/roaur/personal-backend/compare/fastapi-service-v0.2.1...fastapi-service-v0.3.0) (2025-11-28)
+
+
+### Features
+
+* add analysis workers to compose ([b612593](https://github.com/roaur/personal-backend/commit/b612593a833b397e0425c79ca29331f72a5c26a8))
+* **fastapi:** add game analysis endpoints and storage ([8d7dad0](https://github.com/roaur/personal-backend/commit/8d7dad05fea216c222b6f8f40b2e60957d3247e5))
+
 ## [0.2.1](https://github.com/roaur/personal-backend/compare/fastapi-service-v0.2.0...fastapi-service-v0.2.1) (2025-11-27)
 
 
