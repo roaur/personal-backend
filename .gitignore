@@ -11,4 +11,3 @@ airflow/dags/__pycache__/
 celery/celerybeat-schedule
 fastapi/info.log
 .pytest_cache
-celery/celerybeat-schedule
