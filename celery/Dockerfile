@@ -1,9 +1,11 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN apt-get update && apt-get install -y stockfish && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y stockfish 
+RUN ln -s /usr/games/stockfish /usr/local/bin/stockfish
+RUN rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
