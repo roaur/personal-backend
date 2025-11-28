@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/roaur/personal-backend/compare/fastapi-service-v0.3.0...fastapi-service-v0.4.0) (2025-11-28)
+
+
+### Features
+
+* **fastapi:** add metrics endpoint and improve analysis queue ([51d9d1c](https://github.com/roaur/personal-backend/commit/51d9d1c5dd5d08c60c0d0e9f9a38ce9236fa59af))
+
 ## [0.3.0](https://github.com/roaur/personal-backend/compare/fastapi-service-v0.2.1...fastapi-service-v0.3.0) (2025-11-28)
 
 
