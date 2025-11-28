@@ -6,6 +6,7 @@ import sys
 from unittest.mock import MagicMock, patch, call, ANY
 import pytest
 import requests
+import io
 
 # Add the parent directory to sys.path so we can import tasks
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,12 +30,14 @@ sys.modules['utils.config'].settings.fastapi_route = 'localhost:8000'
 
 # Import tasks - these might fail if not implemented yet, which is expected for TDD
 try:
-    from tasks import fetch_player_games, process_game_data, orchestrator
+    from tasks import fetch_player_games, process_game_data, orchestrator, analyze_game, enqueue_analysis_tasks
 except ImportError:
     # Define stubs if they don't exist yet so tests can be written
     fetch_player_games = MagicMock()
     process_game_data = MagicMock()
     orchestrator = MagicMock()
+    analyze_game = MagicMock()
+    enqueue_analysis_tasks = MagicMock()
 
 @patch('tasks.redis_client')
 @patch('tasks.process_game_data.delay')
@@ -194,3 +197,55 @@ def test_orchestrator(mock_get, mock_last_move, mock_fetch):
     args, kwargs = mock_fetch.delay.call_args_list[1]
     assert args[0] == 'opponent1'
     assert kwargs['depth'] == 1
+
+@patch('tasks.requests')
+@patch('tasks.chess.engine.SimpleEngine')
+@patch('tasks.chess.pgn.read_game')
+def test_analyze_game(mock_read_game, mock_engine_cls, mock_requests):
+    # Mock API responses
+    mock_requests.get.return_value.json.return_value = {"pgn": "1. e4"}
+    mock_requests.get.return_value.status_code = 200
+    
+    # Mock Game object
+    mock_game = MagicMock()
+    mock_read_game.return_value = mock_game
+    
+    # Mock Engine
+    mock_engine = MagicMock()
+    mock_engine_cls.popen_uci.return_value = mock_engine
+    
+    # Mock Plugin analysis
+    with patch('tasks.PLUGINS') as mock_plugins:
+        mock_plugin = MagicMock()
+        mock_plugin.name = "test_plugin"
+        mock_plugin.analyze.return_value = {"score": 100}
+        mock_plugins.__iter__.return_value = [mock_plugin]
+        
+        # Run task
+        # We need to import analyze_game from tasks inside the function if it wasn't imported at top level correctly
+        # But we updated the import block above.
+        from tasks import analyze_game
+        
+        analyze_game("game_123")
+        
+        # Verify API calls
+        # settings.fastapi_route is mocked to 'localhost:8000'
+        mock_requests.get.assert_called_with("http://localhost:8000/games/game_123/pgn")
+        
+        mock_requests.post.assert_called()
+        args, kwargs = mock_requests.post.call_args
+        assert kwargs['json'] == {"test_plugin": {"score": 100}}
+
+@patch('tasks.requests')
+def test_enqueue_analysis_tasks(mock_requests):
+    # Mock API response
+    mock_requests.post.return_value.json.return_value = ["game_1", "game_2"]
+    mock_requests.post.return_value.status_code = 200
+    
+    with patch('tasks.analyze_game.delay') as mock_delay:
+        from tasks import enqueue_analysis_tasks
+        enqueue_analysis_tasks()
+        
+        assert mock_delay.call_count == 2
+        mock_delay.assert_any_call("game_1")
+        mock_delay.assert_any_call("game_2")

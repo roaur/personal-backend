@@ -77,8 +77,13 @@ def setup_periodic_tasks(sender, **kwargs):
     """
     # Run the orchestrator every 60 seconds
     sender.add_periodic_task(60.0, orchestrator.s(), name='orchestrator-every-60-seconds')
+    
+    # Run analysis enqueuer every 60 seconds (or different interval)
+    sender.add_periodic_task(60.0, enqueue_analysis_tasks.s(), name='analysis-enqueuer-every-60-seconds')
+
     # Trigger immediately on startup
     orchestrator.delay()
+    enqueue_analysis_tasks.delay()
 
 @app.task
 def orchestrator():
@@ -284,3 +289,103 @@ def process_game_data(game: dict, depth: int):
         
     except Exception as e:
         logging.error(f"Error processing game {game.get('id')}: {e}")
+
+# =============================================================================
+# Analysis Tasks
+# =============================================================================
+
+import chess
+import chess.engine
+import chess.pgn
+import io
+from analysis.plugins.largest_swing import LargestSwingPlugin
+
+# Register plugins
+PLUGINS = [
+    LargestSwingPlugin()
+]
+
+@app.task(queue='analysis_queue')
+def analyze_game(game_id: str):
+    """
+    Performs analysis on a game using Stockfish and registered plugins.
+    """
+    logging.info(f"Starting analysis for game {game_id}")
+    
+    # 1. Fetch PGN from API
+    try:
+        url = f"http://{settings.fastapi_route}/games/{game_id}/pgn"
+        response = requests.get(url)
+        response.raise_for_status()
+        pgn_text = response.json().get("pgn")
+        
+        if not pgn_text:
+            logging.warning(f"No PGN found for game {game_id}")
+            return
+
+        # 2. Parse PGN
+        pgn = io.StringIO(pgn_text)
+        game = chess.pgn.read_game(pgn)
+        
+        if not game:
+            logging.error(f"Failed to parse PGN for game {game_id}")
+            return
+
+        # 3. Initialize Engine
+        # Ensure stockfish is in the PATH (installed via apt-get)
+        engine = chess.engine.SimpleEngine.popen_uci("stockfish")
+        
+        results = {}
+        
+        try:
+            # 4. Run Plugins
+            for plugin in PLUGINS:
+                # TODO: Check if plugin already ran? 
+                # For now, we just re-run or overwrite. 
+                # The API upsert handles merging.
+                
+                logging.info(f"Running plugin {plugin.name} for game {game_id}")
+                plugin_result = plugin.analyze(game, engine)
+                results[plugin.name] = plugin_result
+                
+        finally:
+            engine.quit()
+            
+        # 5. Save Results
+        if results:
+            url = f"http://{settings.fastapi_route}/games/{game_id}/metrics"
+            response = requests.post(url, json=results)
+            response.raise_for_status()
+            logging.info(f"Saved analysis metrics for game {game_id}")
+            
+    except Exception as e:
+        logging.error(f"Error analyzing game {game_id}: {e}")
+        # Retry logic?
+        # self.retry(exc=e, countdown=60, max_retries=3)
+
+@app.task
+def enqueue_analysis_tasks():
+    """
+    Periodic task to find games needing analysis and enqueue them.
+    """
+    try:
+        # Get list of active plugin names
+        plugin_names = [p.name for p in PLUGINS]
+        
+        # Ask API for games needing analysis
+        url = f"http://{settings.fastapi_route}/games/analysis/queue"
+        response = requests.post(url, json=plugin_names) # Body is list of strings
+        response.raise_for_status()
+        
+        game_ids = response.json()
+        
+        count = 0
+        for game_id in game_ids:
+            analyze_game.delay(game_id)
+            count += 1
+            
+        if count > 0:
+            logging.info(f"Enqueued {count} games for analysis")
+            
+    except Exception as e:
+        logging.error(f"Error enqueuing analysis tasks: {e}")
