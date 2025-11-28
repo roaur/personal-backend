@@ -312,6 +312,16 @@ def analyze_game(game_id: str):
     """
     logging.info(f"Starting analysis for game {game_id}")
     
+    # 0. Fetch existing metrics to check per-plugin status later
+    existing_metrics = None
+    try:
+        url = f"http://{settings.fastapi_route}/games/{game_id}/metrics"
+        response = requests.get(url)
+        if response.status_code == 200:
+            existing_metrics = response.json()
+    except Exception as e:
+        logging.warning(f"Failed to check existing metrics for {game_id}: {e}")
+
     # 1. Fetch PGN from API
     try:
         url = f"http://{settings.fastapi_route}/games/{game_id}/pgn"
@@ -321,6 +331,8 @@ def analyze_game(game_id: str):
         
         if not pgn_text:
             logging.warning(f"No PGN found for game {game_id}")
+            # Clear pending status if we can't analyze
+            redis_client.delete(f"analysis_pending:{game_id}")
             return
 
         # 2. Parse PGN
@@ -340,9 +352,10 @@ def analyze_game(game_id: str):
         try:
             # 4. Run Plugins
             for plugin in PLUGINS:
-                # TODO: Check if plugin already ran? 
-                # For now, we just re-run or overwrite. 
-                # The API upsert handles merging.
+                # Check if this plugin already ran
+                if existing_metrics and existing_metrics.get("metrics") and plugin.name in existing_metrics["metrics"]:
+                    logging.info(f"Skipping plugin {plugin.name} for game {game_id}: Already exists.")
+                    continue
                 
                 logging.info(f"Running plugin {plugin.name} for game {game_id}")
                 plugin_result = plugin.analyze(game, engine)
@@ -357,6 +370,11 @@ def analyze_game(game_id: str):
             response = requests.post(url, json=results)
             response.raise_for_status()
             logging.info(f"Saved analysis metrics for game {game_id}")
+        else:
+            logging.info(f"No new analysis results to save for game {game_id}")
+            
+        # Clear pending status
+        redis_client.delete(f"analysis_pending:{game_id}")
             
     except Exception as e:
         logging.error(f"Error analyzing game {game_id}: {e}")
@@ -372,20 +390,35 @@ def enqueue_analysis_tasks():
         # Get list of active plugin names
         plugin_names = [p.name for p in PLUGINS]
         
-        # Ask API for games needing analysis
+        # Ask API for games needing analysis (fetch more to skip pending ones)
         url = f"http://{settings.fastapi_route}/games/analysis/queue"
-        response = requests.post(url, json=plugin_names) # Body is list of strings
+        # Request 1000 candidates
+        response = requests.post(url, json=plugin_names, params={"limit": 1000}) 
         response.raise_for_status()
         
         game_ids = response.json()
         
-        count = 0
+        enqueued_count = 0
+        target_enqueue_count = 100 # We want to add ~100 tasks per run
+        
         for game_id in game_ids:
-            analyze_game.delay(game_id)
-            count += 1
+            if enqueued_count >= target_enqueue_count:
+                break
+                
+            # Deduplication: Check if game is already pending analysis
+            # Key expires in 1 hour (3600s) to handle backlogs
+            redis_key = f"analysis_pending:{game_id}"
+            if redis_client.exists(redis_key):
+                continue
+                
+            # Set key to mark as pending
+            redis_client.set(redis_key, "1", ex=3600)
             
-        if count > 0:
-            logging.info(f"Enqueued {count} games for analysis")
+            analyze_game.delay(game_id)
+            enqueued_count += 1
+            
+        if enqueued_count > 0:
+            logging.info(f"Enqueued {enqueued_count} games for analysis")
             
     except Exception as e:
         logging.error(f"Error enqueuing analysis tasks: {e}")
