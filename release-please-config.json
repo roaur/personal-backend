@@ -1,5 +1,9 @@
 {
   "packages": {
+    "common": {
+      "release-type": "python",
+      "package-name": "common-library"
+    },
     "fastapi": {
       "release-type": "python",
       "package-name": "fastapi-service"
