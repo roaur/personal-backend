@@ -16,7 +16,8 @@ import uvicorn
 import sys
 from fastapi import FastAPI, Depends, HTTPException, Body, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app import schemas, crud, database, utils
+from app import crud, utils
+from common import schemas, database
 import logging
 import coloredlogs
 
@@ -179,7 +180,7 @@ async def add_players_to_games_batch(game_players: list[schemas.GamePlayerCreate
     db_game_players = await crud.add_players_to_games_batch(db, game_players)
     return db_game_players
 
-@app.get("/players/{game_id}", response_model=list[schemas.GamePlayer])
+@app.get("/games/{game_id}/players", response_model=list[schemas.GamePlayer])
 async def get_players_from_game(game_id: str, db: AsyncSession = Depends(get_db)):
     """Retrieves all players for a given game."""
     db_game_players = await crud.get_players_from_game(db, game_id)
