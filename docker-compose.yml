@@ -71,7 +71,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     # Concurrency 1 for Rate Limiting
-    command: celery -A tasks worker -Q api_queue,celery --loglevel=info --concurrency=1 --hostname=producer@%h
+    command: celery -A celery_app worker -Q api_queue,celery --loglevel=info --concurrency=1 --hostname=producer@%h
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -94,7 +94,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     # Concurrency 8 for Parallel Processing
-    command: celery -A tasks worker -Q db_queue --loglevel=info --concurrency=8 --hostname=consumer@%h
+    command: celery -A celery_app worker -Q db_queue --loglevel=info --concurrency=8 --hostname=consumer@%h
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -117,7 +117,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     # Concurrency 1 is enough for scheduling
-    command: celery -A tasks worker -Q analysis_scheduling_queue --loglevel=info --concurrency=1 --hostname=analysis_producer@%h
+    command: celery -A celery_app worker -Q analysis_scheduling_queue --loglevel=info --concurrency=1 --hostname=analysis_producer@%h
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -140,7 +140,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     # Concurrency 4 for analysis (CPU intensive)
-    command: celery -A tasks worker -Q analysis_queue --loglevel=info --concurrency=2 --hostname=analysis_consumer@%h
+    command: celery -A celery_app worker -Q analysis_queue --loglevel=info --concurrency=4 --hostname=analysis_consumer@%h
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -162,7 +162,7 @@ services:
       context: ./celery
       dockerfile: Dockerfile
     restart: always
-    command: celery -A tasks beat --loglevel=info
+    command: celery -A celery_app beat --loglevel=info
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

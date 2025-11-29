@@ -1,10 +1,7 @@
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock, call, ANY
 import sys
 import os
-import sys
-from unittest.mock import MagicMock, patch, call, ANY
-import pytest
 import requests
 import io
 
@@ -21,16 +18,16 @@ os.environ['FASTAPI_ROUTE'] = 'localhost:8000'
 # We need to patch where it is used, or patch the class itself before instantiation
 # Since 'tasks' imports 'utils.config', we need to mock 'utils.config.settings'
 # THIS MUST HAPPEN BEFORE IMPORTING TASKS
-# sys.modules['utils'] = MagicMock()  <-- REMOVED
 sys.modules['utils.config'] = MagicMock()
 sys.modules['utils.config'].settings = MagicMock()
 sys.modules['utils.config'].settings.lichess_username = 'test_user'
 sys.modules['utils.config'].settings.lichess_token = 'test_token'
 sys.modules['utils.config'].settings.fastapi_route = 'localhost:8000'
 
-# Import tasks - these might fail if not implemented yet, which is expected for TDD
+# Import tasks from new locations
 try:
-    from tasks import fetch_player_games, process_game_data, orchestrator, analyze_game, enqueue_analysis_tasks
+    from tasks.fetching import fetch_player_games, process_game_data, orchestrator
+    from tasks.analysis import analyze_game, enqueue_analysis_tasks
 except ImportError:
     # Define stubs if they don't exist yet so tests can be written
     fetch_player_games = MagicMock()
@@ -39,9 +36,9 @@ except ImportError:
     analyze_game = MagicMock()
     enqueue_analysis_tasks = MagicMock()
 
-@patch('tasks.redis_client')
-@patch('tasks.process_game_data.delay')
-@patch('tasks.requests.get')
+@patch('tasks.fetching.redis_client')
+@patch('tasks.fetching.process_game_data.delay')
+@patch('tasks.fetching.requests.get')
 def test_fetch_player_games(mock_get, mock_delay, mock_redis):
     """
     Test that fetch_player_games streams data and dispatches tasks.
@@ -85,8 +82,8 @@ def test_fetch_player_games(mock_get, mock_delay, mock_redis):
         call({'id': 'game2', 'players': {}}, 0)
     ])
 
-@patch('tasks.redis_client')
-@patch('tasks.requests.get')
+@patch('tasks.fetching.redis_client')
+@patch('tasks.fetching.requests.get')
 def test_fetch_player_games_404(mock_get, mock_redis):
     """
     Test that fetch_player_games stops on 404 and does NOT retry.
@@ -106,7 +103,7 @@ def test_fetch_player_games_404(mock_get, mock_redis):
     mock_get.return_value.__exit__.return_value = None
 
     # We need to mock self.retry to assert it's NOT called
-    with patch('tasks.fetch_player_games.retry') as mock_retry:
+    with patch('tasks.fetching.fetch_player_games.retry') as mock_retry:
         fetch_player_games("unknown_user", since=0, depth=0)
         
         # Verify retry was NOT called
@@ -115,14 +112,14 @@ def test_fetch_player_games_404(mock_get, mock_redis):
     # Verify lock was released
     mock_lock.release.assert_called_once()
 
-@patch('tasks.requests.post')
+@patch('tasks.fetching.requests.post')
 def test_process_game_data(mock_post):
     """
     Test that process_game_data:
     1. Extracts players, moves, links.
     2. Posts data to FastAPI.
     """
-    from tasks import process_game_data as real_process_game_data
+    from tasks.fetching import process_game_data as real_process_game_data
     
     game_sample = {
         "id": "game1",
@@ -156,9 +153,9 @@ def test_process_game_data(mock_post):
     
     assert mock_post.call_count >= 1
 
-@patch('tasks.fetch_player_games')
-@patch('tasks.get_last_move_time')
-@patch('tasks.requests.get')
+@patch('tasks.fetching.fetch_player_games')
+@patch('tasks.fetching.get_last_move_time')
+@patch('tasks.fetching.requests.get')
 def test_orchestrator(mock_get, mock_last_move, mock_fetch):
     """
     Test that orchestrator:
@@ -167,7 +164,7 @@ def test_orchestrator(mock_get, mock_last_move, mock_fetch):
     3. Gets next opponent.
     4. Triggers fetch_player_games for opponent.
     """
-    from tasks import orchestrator as real_orchestrator
+    from tasks.fetching import orchestrator as real_orchestrator
     from utils.config import settings
     
     # Setup
@@ -198,11 +195,11 @@ def test_orchestrator(mock_get, mock_last_move, mock_fetch):
     assert args[0] == 'opponent1'
     assert kwargs['depth'] == 1
 
-@patch('tasks.redis_client')
-@patch('tasks.requests.get')
-@patch('tasks.requests.post')
-@patch('tasks.chess.pgn.read_game')
-@patch('tasks.chess.engine.SimpleEngine.popen_uci')
+@patch('tasks.analysis.redis_client')
+@patch('tasks.analysis.requests.get')
+@patch('tasks.analysis.requests.post')
+@patch('tasks.analysis.chess.pgn.read_game')
+@patch('tasks.analysis.chess.engine.SimpleEngine.popen_uci')
 def test_analyze_game(mock_engine_cls, mock_read_game, mock_post, mock_get, mock_redis):
     # Mock GET metrics response (Double-check)
     # First call is to check metrics (return 404 or empty to proceed)
@@ -226,7 +223,7 @@ def test_analyze_game(mock_engine_cls, mock_read_game, mock_post, mock_get, mock
     
     # Mock Plugin Analysis
     # We need to patch PLUGINS or the plugin instance
-    with patch('tasks.PLUGINS', [MagicMock()]) as mock_plugins:
+    with patch('tasks.analysis.PLUGINS', [MagicMock()]) as mock_plugins:
         mock_plugin = mock_plugins[0]
         mock_plugin.name = "test_plugin"
         mock_plugin.analyze.return_value = {"score": 100}
@@ -253,10 +250,10 @@ def test_analyze_game(mock_engine_cls, mock_read_game, mock_post, mock_get, mock
         # Verify Redis cleanup
         mock_redis.delete.assert_called_once_with("analysis_pending:game1")
 
-@patch('tasks.redis_client')
-@patch('tasks.requests.get')
-@patch('tasks.chess.pgn.read_game')
-@patch('tasks.chess.engine.SimpleEngine.popen_uci')
+@patch('tasks.analysis.redis_client')
+@patch('tasks.analysis.requests.get')
+@patch('tasks.analysis.chess.pgn.read_game')
+@patch('tasks.analysis.chess.engine.SimpleEngine.popen_uci')
 def test_analyze_game_skips_if_metrics_exist(mock_engine_cls, mock_read_game, mock_get, mock_redis):
     # Mock GET metrics response (Metrics exist)
     mock_get_metrics_response = MagicMock()
@@ -278,7 +275,7 @@ def test_analyze_game_skips_if_metrics_exist(mock_engine_cls, mock_read_game, mo
     mock_engine = MagicMock()
     mock_engine_cls.return_value = mock_engine
     
-    with patch('tasks.PLUGINS', [MagicMock()]) as mock_plugins:
+    with patch('tasks.analysis.PLUGINS', [MagicMock()]) as mock_plugins:
         mock_plugin = mock_plugins[0]
         mock_plugin.name = "test_plugin"
         
@@ -296,9 +293,9 @@ def test_analyze_game_skips_if_metrics_exist(mock_engine_cls, mock_read_game, mo
         # Should clear Redis key
         mock_redis.delete.assert_called_once_with("analysis_pending:game1")
 
-@patch('tasks.redis_client')
-@patch('tasks.requests.post')
-@patch('tasks.analyze_game.delay')
+@patch('tasks.analysis.redis_client')
+@patch('tasks.analysis.requests.post')
+@patch('tasks.analysis.analyze_game.delay')
 def test_enqueue_analysis_tasks(mock_delay, mock_post, mock_redis):
     # Mock API response
     mock_response = MagicMock()

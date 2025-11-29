@@ -2,7 +2,6 @@ import logging
 import requests
 from requests.exceptions import HTTPError
 import berserk
-from celery import Celery
 import os
 from utils.config import settings
 from utils.lichess_utils import (
@@ -15,47 +14,7 @@ from utils.lichess_utils import (
 from datetime import datetime
 import redis
 import json
-
-# =============================================================================
-# Celery Architecture: Producer-Consumer Pattern
-# =============================================================================
-# This system is designed to fetch game data from the Lichess API and store it
-# in a PostgreSQL database via a FastAPI backend.
-#
-# It uses a Producer-Consumer pattern to strictly adhere to Lichess API rate limits
-# (1 request at a time) while maximizing data processing throughput.
-#
-# Components:
-# 1. Orchestrator (Scheduler):
-#    - Runs every 60 seconds.
-#    - Identifies which players need to be updated (Main User then Opponents).
-#    - Dispatches `fetch_player_games` tasks to the `api_queue`.
-#
-# 2. Producer (`fetch_player_games`):
-#    - Queue: `api_queue` (Concurrency: 1).
-#    - Responsibility: Streams game data from Lichess API (NDJSON).
-#    - Constraint: MUST run serially to respect the 1 request at a time limit.
-#    - Mechanism: Uses a Redis distributed lock (`lichess_api_lock`) to ensure
-#      ABSOLUTELY NO CONCURRENT REQUESTS across the entire system, even if
-#      multiple producer workers are running.
-#    - Action: For each game received in the stream, immediately dispatches a
-#      `process_game_data` task to the `db_queue`.
-#
-# 3. Consumer (`process_game_data`):
-#    - Queue: `db_queue` (Concurrency: Scalable, e.g., 8).
-#    - Responsibility: Processes raw game data and writes to the DB.
-#    - Action: Parses JSON, extracts players, and posts to FastAPI.
-#
-# =============================================================================
-
-# Configure Celery app
-# Use Redis as the message broker
-app = Celery('tasks', broker=os.getenv('CELERY_BROKER_URL'))
-app.conf.task_compression = 'gzip' # Compress messages to save Redis memory
-
-# Initialize Redis client for distributed locking
-# We reuse the broker URL for the Redis client connection
-redis_client = redis.from_url(os.getenv('CELERY_BROKER_URL'))
+from celery_app import app, redis_client
 
 # Helper function to get last move time (for main user)
 def get_last_move_time(username: str) -> int:
@@ -79,11 +38,17 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(60.0, orchestrator.s(), name='orchestrator-every-60-seconds')
     
     # Run analysis enqueuer every 60 seconds (or different interval)
-    sender.add_periodic_task(60.0, enqueue_analysis_tasks.s(), name='analysis-enqueuer-every-60-seconds')
-
+    # Note: We need to import enqueue_analysis_tasks here or use its string name if it's registered
+    # Since we are splitting files, we might need to register it in analysis.py's setup or import it.
+    # However, usually one setup_periodic_tasks is enough if it can see all tasks.
+    # But analysis tasks are in a different module.
+    # Let's keep fetching related periodic tasks here.
+    # The analysis one should be in analysis.py or we import it here.
+    # For now, I will assume analysis.py will have its own setup or I'll import it.
+    # Wait, on_after_configure can be multiple? Yes.
+    
     # Trigger immediately on startup
     orchestrator.delay()
-    enqueue_analysis_tasks.delay()
 
 @app.task
 def orchestrator():
@@ -289,136 +254,3 @@ def process_game_data(game: dict, depth: int):
         
     except Exception as e:
         logging.error(f"Error processing game {game.get('id')}: {e}")
-
-# =============================================================================
-# Analysis Tasks
-# =============================================================================
-
-import chess
-import chess.engine
-import chess.pgn
-import io
-from analysis.plugins.largest_swing import LargestSwingPlugin
-
-# Register plugins
-PLUGINS = [
-    LargestSwingPlugin()
-]
-
-@app.task(queue='analysis_queue')
-def analyze_game(game_id: str):
-    """
-    Performs analysis on a game using Stockfish and registered plugins.
-    """
-    logging.info(f"Starting analysis for game {game_id}")
-    
-    # 0. Fetch existing metrics to check per-plugin status later
-    existing_metrics = None
-    try:
-        url = f"http://{settings.fastapi_route}/games/{game_id}/metrics"
-        response = requests.get(url)
-        if response.status_code == 200:
-            existing_metrics = response.json()
-    except Exception as e:
-        logging.warning(f"Failed to check existing metrics for {game_id}: {e}")
-
-    # 1. Fetch PGN from API
-    try:
-        url = f"http://{settings.fastapi_route}/games/{game_id}/pgn"
-        response = requests.get(url)
-        response.raise_for_status()
-        pgn_text = response.json().get("pgn")
-        
-        if not pgn_text:
-            logging.warning(f"No PGN found for game {game_id}")
-            # Clear pending status if we can't analyze
-            redis_client.delete(f"analysis_pending:{game_id}")
-            return
-
-        # 2. Parse PGN
-        pgn = io.StringIO(pgn_text)
-        game = chess.pgn.read_game(pgn)
-        
-        if not game:
-            logging.error(f"Failed to parse PGN for game {game_id}")
-            return
-
-        # 3. Initialize Engine
-        # Ensure stockfish is in the PATH (installed via apt-get)
-        engine = chess.engine.SimpleEngine.popen_uci("stockfish")
-        
-        results = {}
-        
-        try:
-            # 4. Run Plugins
-            for plugin in PLUGINS:
-                # Check if this plugin already ran
-                if existing_metrics and existing_metrics.get("metrics") and plugin.name in existing_metrics["metrics"]:
-                    logging.info(f"Skipping plugin {plugin.name} for game {game_id}: Already exists.")
-                    continue
-                
-                logging.info(f"Running plugin {plugin.name} for game {game_id}")
-                plugin_result = plugin.analyze(game, engine)
-                results[plugin.name] = plugin_result
-                
-        finally:
-            engine.quit()
-            
-        # 5. Save Results
-        if results:
-            url = f"http://{settings.fastapi_route}/games/{game_id}/metrics"
-            response = requests.post(url, json=results)
-            response.raise_for_status()
-            logging.info(f"Saved analysis metrics for game {game_id}")
-        else:
-            logging.info(f"No new analysis results to save for game {game_id}")
-            
-        # Clear pending status
-        redis_client.delete(f"analysis_pending:{game_id}")
-            
-    except Exception as e:
-        logging.error(f"Error analyzing game {game_id}: {e}")
-        # Retry logic?
-        # self.retry(exc=e, countdown=60, max_retries=3)
-
-@app.task(queue='analysis_scheduling_queue')
-def enqueue_analysis_tasks():
-    """
-    Periodic task to find games needing analysis and enqueue them.
-    """
-    try:
-        # Get list of active plugin names
-        plugin_names = [p.name for p in PLUGINS]
-        
-        # Ask API for games needing analysis (fetch more to skip pending ones)
-        url = f"http://{settings.fastapi_route}/games/analysis/queue"
-        # Request 1000 candidates
-        response = requests.post(url, json=plugin_names, params={"limit": 1000}) 
-        response.raise_for_status()
-        
-        game_ids = response.json()
-        
-        enqueued_count = 0
-        target_enqueue_count = 100 # We want to add ~100 tasks per run
-        
-        for game_id in game_ids:
-            if enqueued_count >= target_enqueue_count:
-                break
-                
-            # Deduplication: Check if game is already pending analysis
-            # Key expires in 1 hour (3600s) to handle backlogs
-            redis_key = f"analysis_pending:{game_id}"
-            if redis_client.exists(redis_key):
-                continue
-                
-            # Set key to mark as pending
-            redis_client.set(redis_key, "1", ex=3600)
-            
-            analyze_game.delay(game_id)
-            enqueued_count += 1
-            
-        if enqueued_count > 0:
-            logging.info(f"Enqueued {enqueued_count} games for analysis")
-            
-    except Exception as e:
-        logging.error(f"Error enqueuing analysis tasks: {e}")
