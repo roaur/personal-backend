@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/roaur/personal-backend/compare/fastapi-service-v0.4.0...fastapi-service-v0.5.0) (2025-11-29)
+
+
+### Features
+
+* **orchestration:** trigger initial release workflow ([756ad09](https://github.com/roaur/personal-backend/commit/756ad0925cfe7d0daa1c3a622ddbbb3a65225f22))
+
 ## [0.4.0](https://github.com/roaur/personal-backend/compare/fastapi-service-v0.3.0...fastapi-service-v0.4.0) (2025-11-28)
 
 
