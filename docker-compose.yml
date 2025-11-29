@@ -62,13 +62,14 @@ services:
         condition: service_healthy
     volumes:
       - ./fastapi:/app
+      - ./common:/app/common
     ports:
       - "8000:8000"
 
   celery_producer:
     build:
-      context: ./celery
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: celery/Dockerfile
     restart: always
     # Concurrency 1 for Rate Limiting
     command: celery -A celery_app worker -Q api_queue,celery --loglevel=info --concurrency=1 --hostname=producer@%h
@@ -87,11 +88,12 @@ services:
       - pgbouncer
     volumes:
       - ./celery:/app
+      - ./common:/app/common
 
   celery_consumer:
     build:
-      context: ./celery
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: celery/Dockerfile
     restart: always
     # Concurrency 8 for Parallel Processing
     command: celery -A celery_app worker -Q db_queue --loglevel=info --concurrency=8 --hostname=consumer@%h
@@ -110,11 +112,12 @@ services:
       - pgbouncer
     volumes:
       - ./celery:/app
+      - ./common:/app/common
 
   analysis_producer:
     build:
-      context: ./celery
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: celery/Dockerfile
     restart: always
     # Concurrency 1 is enough for scheduling
     command: celery -A celery_app worker -Q analysis_scheduling_queue --loglevel=info --concurrency=1 --hostname=analysis_producer@%h
@@ -133,11 +136,12 @@ services:
       - pgbouncer
     volumes:
       - ./celery:/app
+      - ./common:/app/common
 
   analysis_consumer:
     build:
-      context: ./celery
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: celery/Dockerfile
     restart: always
     # Concurrency 4 for analysis (CPU intensive)
     command: celery -A celery_app worker -Q analysis_queue --loglevel=info --concurrency=4 --hostname=analysis_consumer@%h
@@ -156,11 +160,12 @@ services:
       - pgbouncer
     volumes:
       - ./celery:/app
+      - ./common:/app/common
 
   celery_beat:
     build:
-      context: ./celery
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: celery/Dockerfile
     restart: always
     command: celery -A celery_app beat --loglevel=info
     environment:
@@ -178,6 +183,7 @@ services:
       - pgbouncer
     volumes:
       - ./celery:/app
+      - ./common:/app/common
 
   # --- DAGSTER ORCHESTRATION ---
 
