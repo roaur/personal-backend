@@ -16,13 +16,14 @@ os.environ['FASTAPI_ROUTE'] = 'localhost:8000'
 
 # Mock settings to avoid validation errors during import
 # We need to patch where it is used, or patch the class itself before instantiation
-# Since 'tasks' imports 'utils.config', we need to mock 'utils.config.settings'
+# Since 'tasks' imports 'common.config', we need to mock 'common.config.settings'
 # THIS MUST HAPPEN BEFORE IMPORTING TASKS
-sys.modules['utils.config'] = MagicMock()
-sys.modules['utils.config'].settings = MagicMock()
-sys.modules['utils.config'].settings.lichess_username = 'test_user'
-sys.modules['utils.config'].settings.lichess_token = 'test_token'
-sys.modules['utils.config'].settings.fastapi_route = 'localhost:8000'
+sys.modules['common.config'] = MagicMock()
+sys.modules['common.config'].settings = MagicMock()
+sys.modules['common.config'].settings.lichess_username = 'test_user'
+sys.modules['common.config'].settings.lichess_token = 'test_token'
+sys.modules['common.config'].settings.fastapi_route = 'localhost:8000'
+sys.modules['common.config'].settings.celery_broker_url = 'redis://localhost:6379/0'
 
 # Import tasks from new locations
 try:
@@ -165,7 +166,7 @@ def test_orchestrator(mock_get, mock_last_move, mock_fetch):
     4. Triggers fetch_player_games for opponent.
     """
     from tasks.fetching import orchestrator as real_orchestrator
-    from utils.config import settings
+    from common.config import settings
     
     # Setup
     mock_last_move.return_value = 123456

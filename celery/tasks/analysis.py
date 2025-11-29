@@ -5,7 +5,7 @@ import chess.engine
 import chess.pgn
 import io
 from analysis.plugins.largest_swing import LargestSwingPlugin
-from utils.config import settings
+from common.config import settings
 from celery_app import app, redis_client
 
 # Register plugins

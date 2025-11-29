@@ -3,7 +3,7 @@ import requests
 from requests.exceptions import HTTPError
 import berserk
 import os
-from utils.config import settings
+from common.config import settings
 from utils.lichess_utils import (
     setup_berserk_client, 
     post_game,

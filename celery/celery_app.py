@@ -2,9 +2,11 @@ import os
 import redis
 from celery import Celery
 
+from common.config import settings
+
 # Configure Celery app
 # Use Redis as the message broker
-app = Celery('personal_backend', broker=os.getenv('CELERY_BROKER_URL'))
+app = Celery('personal_backend', broker=settings.celery_broker_url)
 app.conf.task_compression = 'gzip' # Compress messages to save Redis memory
 
 # Include task modules so Celery can find them
@@ -12,7 +14,7 @@ app.conf.imports = ['tasks.fetching', 'tasks.analysis']
 
 # Initialize Redis client for distributed locking
 # We reuse the broker URL for the Redis client connection
-redis_client = redis.from_url(os.getenv('CELERY_BROKER_URL'))
+redis_client = redis.from_url(settings.celery_broker_url)
 
 # Define Beat Schedule
 app.conf.beat_schedule = {
