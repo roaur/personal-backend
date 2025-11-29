@@ -7,6 +7,10 @@
     "celery": {
       "release-type": "python",
       "package-name": "celery-service"
+    },
+    "orchestration": {
+      "release-type": "python",
+      "package-name": "orchestration-service"
     }
   },
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
