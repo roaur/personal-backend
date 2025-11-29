@@ -179,6 +179,47 @@ services:
     volumes:
       - ./celery:/app
 
+  # --- DAGSTER ORCHESTRATION ---
+
+  dagster_webserver:
+    build:
+      context: .
+      dockerfile: orchestration/Dockerfile
+    entrypoint: >
+      /bin/sh -c "python /opt/dagster/app/orchestration/init_db.py &&  dagster-webserver -h 0.0.0.0 -p 3000 -w orchestration/workspace.yaml"
+    container_name: dagster_webserver
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: dagster # Vital: Point to the Dagster DB
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/opt/dagster/app # Mount code for hot-reloading
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dagster_daemon:
+    build:
+      context: .
+      dockerfile: orchestration/Dockerfile
+    entrypoint: [ "dagster-daemon", "run", "-w", "orchestration/workspace.yaml" ]
+    container_name: dagster_daemon
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: dagster
+    volumes:
+      - .:/opt/dagster/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dagster_webserver:
+        condition: service_started
+
 volumes:
   postgres_data:
 

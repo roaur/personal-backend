@@ -1,0 +1,16 @@
+storage:
+  postgres:
+    postgres_db:
+      username:
+        env: POSTGRES_USER
+      password:
+        env: POSTGRES_PASSWORD
+      hostname: postgres  # Connecting DIRECTLY to the container, not PgBouncer
+      db_name: dagster    # Separate DB
+      port: 5432
+
+run_coordinator:
+  module: dagster.core.run_coordinator
+  class: QueuedRunCoordinator
+  config:
+    max_concurrent_runs: 12 # Limit based on your CPU cores
