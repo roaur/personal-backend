@@ -13,16 +13,7 @@ PLUGINS = [
     LargestSwingPlugin()
 ]
 
-@app.on_after_configure.connect
-def setup_periodic_tasks(sender, **kwargs):
-    """
-    Configures periodic tasks (Celery Beat) for analysis.
-    """
-    # Run analysis enqueuer every 60 seconds
-    sender.add_periodic_task(60.0, enqueue_analysis_tasks.s(), name='analysis-enqueuer-every-60-seconds')
-    
-    # Trigger immediately on startup
-    enqueue_analysis_tasks.delay()
+
 
 @app.task(queue='analysis_queue')
 def analyze_game(game_id: str):

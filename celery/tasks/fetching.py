@@ -29,26 +29,7 @@ def get_last_move_time(username: str) -> int:
     logging.info(f"Last move time received for {username}: {output['last_move_time']}")
     return output['last_move_time']
 
-@app.on_after_configure.connect
-def setup_periodic_tasks(sender, **kwargs):
-    """
-    Configures periodic tasks (Celery Beat).
-    """
-    # Run the orchestrator every 60 seconds
-    sender.add_periodic_task(60.0, orchestrator.s(), name='orchestrator-every-60-seconds')
-    
-    # Run analysis enqueuer every 60 seconds (or different interval)
-    # Note: We need to import enqueue_analysis_tasks here or use its string name if it's registered
-    # Since we are splitting files, we might need to register it in analysis.py's setup or import it.
-    # However, usually one setup_periodic_tasks is enough if it can see all tasks.
-    # But analysis tasks are in a different module.
-    # Let's keep fetching related periodic tasks here.
-    # The analysis one should be in analysis.py or we import it here.
-    # For now, I will assume analysis.py will have its own setup or I'll import it.
-    # Wait, on_after_configure can be multiple? Yes.
-    
-    # Trigger immediately on startup
-    orchestrator.delay()
+
 
 @app.task
 def orchestrator():
