@@ -9,22 +9,22 @@ on:
       - master
 
 jobs:
-  test-celery:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        
-      - name: Build Celery Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./celery
-          load: true
-          tags: celery-test:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          
-      - name: Run Tests
+      - name: Create .env file
+        run: |
+          cat << EOF > .env
+          POSTGRES_USER=testuser
+          POSTGRES_PASSWORD=testpass
+          POSTGRES_DB=testdb
+          CELERY_BROKER_URL=redis://redis:6379/0
+          LICHESS_TOKEN=dummy_token
+          LICHESS_USERNAME=dummy_user
+          FASTAPI_ROUTE=http://fastapi:8000
+          EOF
+      
+      - name: Run all tests
         run: make test
