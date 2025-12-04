@@ -18,7 +18,7 @@ restart: ## Restart all services
 logs: ## Follow logs for all services
 	docker compose logs -f
 
-test: test-fastapi test-celery ## Run all tests
+test: build up test-fastapi test-celery down ## Run all tests
 
 test-fastapi: ## Run FastAPI tests
 	@echo "Running FastAPI tests..."
