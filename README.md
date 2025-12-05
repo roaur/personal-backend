@@ -25,11 +25,12 @@ The system is split into specialized workers to handle different types of worklo
   - **High Concurrency**: Processes raw game data in parallel and writes to the DB.
 
 ### 2. Analysis (Plugins)
-- **Scheduler (`analysis_producer`)**:
-  - Finds games that need analysis and enqueues them.
-- **Worker (`analysis_consumer`)**:
-  - Runs CPU-intensive analysis tasks using **Stockfish**.
-  - **Plugin System**: Analysis logic is modular. New plugins can be added to `celery/analysis/plugins/` to calculate different metrics without changing the core worker.
+- **Shared Library (`common/analytics`)**:
+  - Contains reusable analysis logic and plugins.
+  - **Plugins**: Modular classes (subclassing `BaseAnalytic`) that perform specific calculations (e.g., "Move Count", "Eval Swing").
+- **Orchestration (Dagster)**:
+  - **Dynamic Assets**: Dagster automatically scans `common/analytics/plugins/` and creates assets for each analytic.
+  - **Batch Processing**: Efficiently finds games pending analysis (using "Left Join" strategy) and processes them in batches.
 
 ```mermaid
 graph LR
@@ -42,11 +43,10 @@ graph LR
     Q2 -->|Consume| Cons[Consumer]
     Cons -->|Write| API[FastAPI]
     
-    Beat -->|Trigger| AnSched[Analysis Scheduler]
-    AnSched -->|Enqueue| Q3[(Redis: analysis_queue)]
-    Q3 -->|Consume| AnWork[Analysis Worker]
-    AnWork -->|Run Plugins| Stockfish
-    AnWork -->|Save Metrics| API
+    Dagster[Dagster Daemon] -->|Schedule| Assets[Analytic Assets]
+    Assets -->|Load| Plugins[Plugins]
+    Assets -->|Query| DB[(Postgres)]
+    Assets -->|Update| DB
 ```
 
 ## 📦 Services
@@ -56,8 +56,8 @@ graph LR
 | `fastapi` | API / Data Layer | Central REST API and database interface. |
 | `celery_producer` | Ingestion | Fetches data from Lichess. **Global Lock ensures serial execution**. |
 | `celery_consumer` | Processing | Processes raw data and writes to DB. **Concurrency: 8**. |
-| `analysis_producer`| Scheduling | Finds games needing analysis. |
-| `analysis_consumer`| Analysis | Runs Stockfish analysis plugins. **Concurrency: 4**. |
+| `dagster_webserver`| Orchestration UI | User interface for managing and viewing analytics runs. |
+| `dagster_daemon` | Orchestrator | Runs scheduled runs and sensors for analytics assets. |
 | `celery_beat` | Scheduler | Triggers periodic tasks. |
 | `redis` | Broker | Message broker for Celery queues. |
 | `postgres` | Database | Persistent storage. |
@@ -82,7 +82,7 @@ docker-compose up --build -d
 
 ### 3. Verify
 ```bash
-docker-compose logs -f celery_producer analysis_consumer
+docker-compose logs -f celery_producer dagster_daemon
 ```
 
 ## 🧪 Development
@@ -112,11 +112,15 @@ make test
 ├── AGENTS.md           # Detailed Architecture Documentation
 ├── celery/             # Celery Workers
 │   ├── celery_app.py   # App Entry Point & Schedule
-│   ├── tasks/          # Task Modules
-│   │   ├── fetching.py # Ingestion Tasks
-│   │   └── analysis.py # Analysis Tasks
-│   └── analysis/       # Analysis Logic
-│       └── plugins/    # Pluggable Analysis Metrics
+│   └── tasks/          # Task Modules
+├── common/             # Shared Library
+│   ├── analytics/      # Analysis Logic & Plugins
+│   │   ├── base.py     # Abstract Base Classes
+│   │   └── plugins/    # Pluggable Analysis Metrics
+│   └── models.py       # Database Schema
 ├── fastapi/            # Backend API
+├── orchestration/      # Dagster Orchestration
+│   ├── assets/         # Dynamic Analytic Assets
+│   └── repository.py   # Dagster Repository
 └── docker-compose.yml  # Infrastructure Definition
 ```
