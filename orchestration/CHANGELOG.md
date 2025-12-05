@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/roaur/personal-backend/compare/orchestration-service-v0.2.0...orchestration-service-v0.3.0) (2025-12-05)
+
+
+### Features
+
+* **orchestration:** add dynamic dagster assets for analytics ([b73b38e](https://github.com/roaur/personal-backend/commit/b73b38e4457a3e5f32a264e5653145f86f3fa5f0))
+
 ## [0.2.0](https://github.com/roaur/personal-backend/compare/orchestration-service-v0.1.0...orchestration-service-v0.2.0) (2025-11-29)
 
 
