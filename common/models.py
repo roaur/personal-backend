@@ -128,3 +128,31 @@ class GameMetrics(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Text, ForeignKey('chess.games.game_id', ondelete='CASCADE'), unique=True, nullable=False)
     metrics = Column(JSONB, nullable=False, default={})
+
+class AnalyticsType(Base):
+    """
+    Lookup table for types of analytics.
+    """
+    __tablename__ = 'analytics_types'
+    __table_args__ = {'schema': 'chess'}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), unique=True, nullable=False)
+    description = Column(Text)
+    version = Column(String(50))
+
+class AnalysisStatus(Base):
+    """
+    Tracks the status of an analytic for a specific game.
+    """
+    __tablename__ = 'analysis_status'
+    __table_args__ = (
+        Index('ix_analysis_status_game_analytic', 'game_id', 'analytic_id', unique=True),
+        {'schema': 'chess'}
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(String(255), ForeignKey('chess.games.game_id', ondelete='CASCADE'), nullable=False)
+    analytic_id = Column(Integer, ForeignKey('chess.analytics_types.id', ondelete='CASCADE'), nullable=False)
+    status = Column(String(50), nullable=False)  # e.g., 'completed', 'failed', 'pending'
+    updated_at = Column(TIMESTAMP(timezone=True), nullable=False)
