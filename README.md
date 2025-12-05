@@ -45,6 +45,8 @@ graph LR
     
     Dagster[Dagster Daemon] -->|Schedule| Assets[Analytic Assets]
     Assets -->|Load| Plugins[Plugins]
+    Assets -.->|Read| Q2
+    Assets -.->|Read| API[FastAPI]
     Assets -->|Query| DB[(Postgres)]
     Assets -->|Update| DB
 ```
