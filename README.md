@@ -34,10 +34,9 @@ The system is split into specialized workers to handle different types of worklo
 
 ```mermaid
 graph LR
-    Beat[Celery Beat] -->|Trigger| Orch[Orchestrator]
-    Orch -->|Dispatch| Prod[Producer]
-    Prod -->|Stream| Q1[(Redis: api_queue)]
-    Q1 -->|Fetch| Lichess[Lichess API]
+    Beat[Celery Beat] -->|Enqueue| Q1[(Redis: api_queue)]
+    Q1 -->|Consume| Prod[Producer]
+    Prod -->|Fetch| Lichess[Lichess API]
     Lichess -->|NDJSON| Prod
     Prod -->|Enqueue| Q2[(Redis: db_queue)]
     Q2 -->|Consume| Cons[Consumer]
@@ -45,7 +44,6 @@ graph LR
     
     Dagster[Dagster Daemon] -->|Schedule| Assets[Analytic Assets]
     Assets -->|Load| Plugins[Plugins]
-    Assets -.->|Read| Q2
     Assets -.->|Read| API[FastAPI]
     Assets -->|Query| DB[(Postgres)]
     Assets -->|Update| DB
